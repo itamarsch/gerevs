@@ -21,13 +21,34 @@ impl AddressType {
         *self as u8
     }
 }
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SocksSocketAddr {
     pub port: u16,
     pub addr: Addr,
 }
+impl SocksSocketAddr {
+    /// Turns `Self` into: AddrType+ADDR+PORT
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut bytes = Vec::with_capacity(18);
 
-#[derive(Debug)]
+        bytes.push(self.addr.addr_type().to_u8());
+
+        match &self.addr {
+            Addr::Ipv4(addr) => bytes.extend_from_slice(&addr.octets()[..]),
+            Addr::Ipv6(addr) => bytes.extend_from_slice(&addr.octets()[..]),
+            Addr::Domain(domain) => {
+                assert!(domain.len() < 256);
+                bytes.push(domain.len() as u8);
+                bytes.extend_from_slice(domain.as_bytes())
+            }
+        }
+        bytes.extend_from_slice(&self.port.to_be_bytes());
+
+        bytes
+    }
+}
+
+#[derive(Debug, Clone)]
 pub enum Addr {
     Ipv4(Ipv4Addr),
     Ipv6(Ipv6Addr),
