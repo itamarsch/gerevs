@@ -1,7 +1,6 @@
-use gerev::{
-    addr::Addr,
-    protocol::{socks_request, write_connect_reponse},
-    reply::Reply,
+use gerev::socks5_socket::{
+    protocol::{addr::Addr, command::Command, reply::Reply},
+    Sock5Socket,
 };
 use std::{
     error::Error,
@@ -16,10 +15,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
         let (client, _addr) = server.accept().await?;
         println!("Connection");
         tokio::spawn(async move {
-            let mut client = client;
-            let Ok((command, addr)) = socks_request(&mut client).await else {
+            let client = client;
+            let mut client = Sock5Socket::new(client);
+            let Ok((command, addr)) = client.socks_request().await else {
                 return;
             };
+
+            assert_eq!(command, Command::Connect);
 
             let result = match addr.addr {
                 Addr::Ipv4(addrv4) => {
@@ -34,8 +36,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
             println!("Connected to server!");
             match result {
                 Ok(mut server) => {
-                    let result =
-                        write_connect_reponse(&mut client, Reply::Success, addr.clone()).await;
+                    let result = client
+                        .write_connect_reponse(Reply::Success, addr.clone())
+                        .await;
+
                     if let Err(err) = result {
                         println!("Failed writing response: {:?}", err);
                         return;
@@ -47,9 +51,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     println!("Connectoin closed! hurray");
                 }
                 Err(_) => {
-                    let _err =
-                        write_connect_reponse(&mut client, Reply::GeneralFailure, addr.clone())
-                            .await;
+                    let _err = client
+                        .write_connect_reponse(Reply::GeneralFailure, addr.clone())
+                        .await;
                 }
             };
         });
