@@ -1,4 +1,5 @@
 use gerev::socks5_socket::{
+    auth::no_auth_authenticator::NoAuthAuthenticator,
     protocol::{addr::Addr, command::Command, reply::Reply},
     Sock5Socket,
 };
@@ -16,8 +17,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
         println!("Connection");
         tokio::spawn(async move {
             let client = client;
-            let mut client = Sock5Socket::new(client);
-            let Ok((command, addr)) = client.socks_request().await else {
+            let mut client = Sock5Socket::new(client, NoAuthAuthenticator);
+            let Ok((command, addr, ())) = client.socks_request().await else {
                 return;
             };
 
@@ -33,9 +34,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 Addr::Domain(_) => todo!("Use dns-lookup"),
             };
 
-            println!("Connected to server!");
             match result {
                 Ok(mut server) => {
+                    println!("Connected to server!");
                     let result = client
                         .write_connect_reponse(Reply::Success, addr.clone())
                         .await;
@@ -52,7 +53,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 }
                 Err(_) => {
                     let _err = client
-                        .write_connect_reponse(Reply::GeneralFailure, addr.clone())
+                        .write_connect_reponse(Reply::ConnectionRefused, addr.clone())
                         .await;
                 }
             };

@@ -1,5 +1,6 @@
 use std::{
-    io,
+    io::{self},
+    marker::PhantomData,
     net::{Ipv4Addr, Ipv6Addr},
     pin::Pin,
 };
@@ -9,32 +10,48 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 use crate::socks5_socket::protocol::methods::AuthMethod;
 
-use self::protocol::{
-    addr::{Addr, AddressType, SocksSocketAddr},
-    command::Command,
-    reply::Reply,
-    RESERVED, VERSION,
+use self::{
+    auth::Authenticator,
+    protocol::{
+        addr::{Addr, AddressType, SocksSocketAddr},
+        command::Command,
+        reply::Reply,
+        RESERVED, VERSION,
+    },
 };
 
+pub mod auth;
 pub mod protocol;
 
-pub struct Sock5Socket<T> {
+pub struct Sock5Socket<T, C, A> {
     inner: T,
+    authenticator: A,
+    phantom_data: PhantomData<C>,
 }
 
-impl<T> Sock5Socket<T>
+impl<T, Credentials, A> Sock5Socket<T, Credentials, A>
 where
-    T: AsyncRead + AsyncWrite + Unpin,
+    Self: Unpin + Send,
+    T: AsyncRead + AsyncWrite + Unpin + Send,
+    A: Authenticator<T, Credentials> + Unpin,
+    Credentials: Unpin,
 {
-    pub fn new(inner: T) -> Self {
-        Self { inner }
+    pub fn new(inner: T, authenticator: A) -> Self {
+        Self {
+            inner,
+            authenticator,
+            phantom_data: PhantomData,
+        }
     }
-    pub async fn socks_request(&mut self) -> io::Result<(Command, SocksSocketAddr)> {
+    pub async fn socks_request(&mut self) -> io::Result<(Command, SocksSocketAddr, Credentials)> {
         let methods = self.parse_methods().await?;
 
-        if methods.contains(&AuthMethod::NoAuthRequired) {
-            self.write_auth_method(AuthMethod::NoAuthRequired).await?;
-        }
+        let method = self.authenticator.select_method(&methods);
+        self.write_auth_method(method).await?;
+
+        let Some(credentials) = self.authenticator.authenticate(&mut self.inner).await else {
+            return Err(io::ErrorKind::InvalidInput.into());
+        };
 
         let (command, addr_type) = self.parse_request().await?;
         let addr = self.parse_addr(addr_type).await?;
@@ -43,7 +60,7 @@ where
             methods, command, addr_type, addr
         );
 
-        Ok((command, addr))
+        Ok((command, addr, credentials))
     }
 
     pub async fn write_connect_reponse(
@@ -121,9 +138,11 @@ where
     }
 }
 
-impl<T> AsyncRead for Sock5Socket<T>
+impl<T, C, A> AsyncRead for Sock5Socket<T, C, A>
 where
     T: AsyncRead + Unpin,
+    C: Unpin,
+    A: Unpin,
 {
     fn poll_read(
         mut self: std::pin::Pin<&mut Self>,
@@ -134,9 +153,11 @@ where
     }
 }
 
-impl<T> AsyncWrite for Sock5Socket<T>
+impl<T, C, A> AsyncWrite for Sock5Socket<T, C, A>
 where
     T: AsyncWrite + Unpin,
+    C: Unpin,
+    A: Unpin,
 {
     fn poll_write(
         mut self: Pin<&mut Self>,
