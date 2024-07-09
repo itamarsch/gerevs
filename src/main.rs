@@ -1,7 +1,7 @@
-use gerev::socks5_socket::{
-    auth::no_auth_authenticator::NoAuthAuthenticator,
-    protocol::{addr::Addr, command::Command, reply::Reply},
-    Sock5Socket,
+use gerev::{
+    auth::simple_user_authenticator::simple_user_authenticator,
+    protocol::{Addr, Command, Reply},
+    socks5_socket::Sock5Socket,
 };
 use std::{
     error::Error,
@@ -17,7 +17,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         println!("Connection");
         tokio::spawn(async move {
             let client = client;
-            let mut client = Sock5Socket::new(client, NoAuthAuthenticator);
+            let mut client = Sock5Socket::new(client, simple_user_authenticator());
             let Ok((command, addr, ())) = client.socks_request().await else {
                 return;
             };

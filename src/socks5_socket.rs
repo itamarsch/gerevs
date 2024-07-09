@@ -8,20 +8,11 @@ use std::{
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-use crate::socks5_socket::protocol::methods::AuthMethod;
+use crate::auth::Authenticator;
 
-use self::{
-    auth::Authenticator,
-    protocol::{
-        addr::{Addr, AddressType, SocksSocketAddr},
-        command::Command,
-        reply::Reply,
-        RESERVED, VERSION,
-    },
+use crate::protocol::{
+    Addr, AddressType, AuthMethod, Command, Reply, SocksSocketAddr, RESERVED, VERSION,
 };
-
-pub mod auth;
-pub mod protocol;
 
 pub struct Sock5Socket<T, C, A> {
     inner: T,
@@ -49,9 +40,13 @@ where
         let method = self.authenticator.select_method(&methods);
         self.write_auth_method(method).await?;
 
-        let Some(credentials) = self.authenticator.authenticate(&mut self.inner).await else {
-            return Err(io::ErrorKind::InvalidInput.into());
+        let credentials = match self.authenticator.authenticate(&mut self.inner).await {
+            Ok(Some(credentials)) => credentials,
+            _ => {
+                return Err(io::ErrorKind::InvalidInput.into());
+            }
         };
+        println!("Credentials");
 
         let (command, addr_type) = self.parse_request().await?;
         let addr = self.parse_addr(addr_type).await?;
