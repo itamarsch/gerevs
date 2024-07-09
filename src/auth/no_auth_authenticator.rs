@@ -4,7 +4,7 @@ use tokio::io::{AsyncRead, AsyncWrite};
 
 use crate::protocol::AuthMethod;
 
-use super::{user_authemticator::UserAuthenticator, Authenticator};
+use super::Authenticator;
 
 pub struct NoAuthAuthenticator;
 

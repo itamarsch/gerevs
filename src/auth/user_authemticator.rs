@@ -11,7 +11,7 @@ use crate::protocol::{AuthMethod, VERSION};
 
 use super::Authenticator;
 
-const UserPasswordVersion: u8 = 0x01;
+const USER_PASSWORD_VERSION: u8 = 0x01;
 
 #[derive(Debug)]
 pub struct User {
@@ -82,7 +82,7 @@ where
     {
         let version = conn.read_u8().await?;
 
-        if version != UserPasswordVersion {
+        if version != USER_PASSWORD_VERSION {
             return Err(ErrorKind::InvalidData.into());
         }
         let username_len = conn.read_u8().await?;
