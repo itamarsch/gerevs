@@ -1,6 +1,6 @@
 use std::{future::Future, pin::Pin};
 
-use super::user_authemticator::{User, UserAuthenticator};
+use super::user_authenticator::{User, UserAuthenticator};
 
 fn validate_user(user: User) -> Pin<Box<dyn Future<Output = Option<()>> + Send>> {
     Box::pin(async move {

@@ -6,7 +6,7 @@ use crate::protocol::AuthMethod;
 
 pub mod no_auth_authenticator;
 pub mod simple_user_authenticator;
-pub mod user_authemticator;
+pub mod user_authenticator;
 
 pub trait Authenticator<T, R>
 where
