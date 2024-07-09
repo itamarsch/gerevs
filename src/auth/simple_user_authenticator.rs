@@ -4,8 +4,11 @@ use super::user_authemticator::{User, UserAuthenticator};
 
 fn validate_user(user: User) -> Pin<Box<dyn Future<Output = Option<()>> + Send>> {
     Box::pin(async move {
-        println!("User: {:?}", user);
-        None
+        if user.username == "admin1" && user.password == "hi" {
+            Some(())
+        } else {
+            None
+        }
     })
 }
 
