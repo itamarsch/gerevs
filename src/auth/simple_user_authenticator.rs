@@ -1,18 +1,25 @@
-use std::{future::Future, pin::Pin};
+use std::io;
 
-use super::user_authenticator::{User, UserAuthenticator};
+use super::user_authenticator::{User, UserAuthenticator, UserValidator};
 
-fn validate_user(user: User) -> Pin<Box<dyn Future<Output = Option<()>> + Send>> {
-    Box::pin(async move {
-        if user.username == "admin1" && user.password == "hi" {
-            Some(())
-        } else {
-            None
-        }
-    })
+pub struct SingleUserValidator {
+    valid_username: String,
+    valid_password: String,
 }
 
-pub fn simple_user_authenticator(
-) -> UserAuthenticator<(), impl FnMut(User) -> Pin<Box<dyn Future<Output = Option<()>> + Send>>> {
-    UserAuthenticator::new(validate_user)
+impl UserValidator<()> for SingleUserValidator {
+    async fn validate_user(&mut self, user: User) -> io::Result<Option<()>> {
+        if user.username == self.valid_username && user.password == self.valid_password {
+            Ok(Some(()))
+        } else {
+            Ok(None)
+        }
+    }
+}
+
+pub fn simple_user_authenticator() -> UserAuthenticator<(), SingleUserValidator> {
+    UserAuthenticator::new(SingleUserValidator {
+        valid_username: "itamar".into(),
+        valid_password: "schwartz".into(),
+    })
 }

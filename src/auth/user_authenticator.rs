@@ -2,7 +2,6 @@ use std::{
     future::Future,
     io::{self, ErrorKind},
     marker::PhantomData,
-    pin::Pin,
 };
 
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
@@ -25,9 +24,13 @@ enum AuthStatus {
     Failure = 0x01,
 }
 
+pub trait UserValidator<R> {
+    fn validate_user(&mut self, user: User) -> impl Future<Output = io::Result<Option<R>>> + Send;
+}
+
 pub struct UserAuthenticator<R, U>
 where
-    U: FnMut(User) -> Pin<Box<dyn Future<Output = Option<R>> + Send>>,
+    U: UserValidator<R>,
 {
     phantom_data_credentials: PhantomData<R>,
     user_validator: U,
@@ -37,12 +40,12 @@ impl<T, R, U> Authenticator<T, R> for UserAuthenticator<R, U>
 where
     T: AsyncRead + AsyncWrite + Unpin + Send,
     R: Send + Sync,
-    U: FnMut(User) -> Pin<Box<dyn Future<Output = Option<R>> + Send>> + Sync + Send,
+    U: UserValidator<R> + Send + Sync,
 {
     async fn authenticate(&mut self, conn: &mut T) -> io::Result<Option<R>> {
         let user = self.get_user(conn).await?;
-        let user_validator = &mut self.user_validator;
-        let credentials = user_validator(user).await;
+
+        let credentials = self.user_validator.validate_user(user).await?;
 
         self.send_authentication_result(
             conn,
@@ -68,7 +71,7 @@ where
 
 impl<R, U> UserAuthenticator<R, U>
 where
-    U: FnMut(User) -> Pin<Box<dyn Future<Output = Option<R>> + Send>>,
+    U: UserValidator<R>,
 {
     pub fn new(user_validator: U) -> UserAuthenticator<R, U> {
         UserAuthenticator {
