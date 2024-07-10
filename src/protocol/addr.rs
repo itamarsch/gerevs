@@ -1,4 +1,4 @@
-use std::net::{Ipv4Addr, Ipv6Addr};
+use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr};
 
 #[derive(Debug, Clone, Copy)]
 pub enum AddressType {
@@ -45,6 +45,21 @@ impl SocksSocketAddr {
         bytes.extend_from_slice(&self.port.to_be_bytes());
 
         bytes
+    }
+}
+
+impl From<SocketAddr> for SocksSocketAddr {
+    fn from(value: SocketAddr) -> Self {
+        match value {
+            SocketAddr::V4(ipv4) => SocksSocketAddr {
+                port: ipv4.port(),
+                addr: Addr::Ipv4(*ipv4.ip()),
+            },
+            SocketAddr::V6(ipv6) => SocksSocketAddr {
+                port: ipv6.port(),
+                addr: Addr::Ipv6(*ipv6.ip()),
+            },
+        }
     }
 }
 

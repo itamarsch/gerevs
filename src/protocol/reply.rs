@@ -35,6 +35,15 @@ impl Reply {
     }
 }
 
+impl Reply {
+    pub fn from_io_result<T>(value: &io::Result<T>) -> Self {
+        match value {
+            Ok(_) => Reply::Success,
+            Err(err) => err.kind().into(),
+        }
+    }
+}
+
 impl From<io::ErrorKind> for Reply {
     fn from(error_kind: io::ErrorKind) -> Self {
         match error_kind {
@@ -60,10 +69,4 @@ impl From<io::ErrorKind> for Reply {
             _ => Reply::GeneralFailure,
         }
     }
-}
-
-fn main() {
-    let error_kind = io::ErrorKind::ConnectionRefused;
-    let reply: Reply = error_kind.into();
-    println!("Reply code: {:?}", reply as u8);
 }

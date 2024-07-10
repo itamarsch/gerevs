@@ -47,16 +47,9 @@ where
             .establish_connection(addr.clone(), credntials)
             .await;
 
-        let conn = match res {
-            Ok(conn) => {
-                self.write_connect_reponse(Reply::Success, addr).await?;
-                conn
-            }
-            Err(err) => {
-                self.write_connect_reponse(err.kind().into(), addr).await?;
-                return Err(err);
-            }
-        };
+        self.write_connect_reponse(Reply::from_io_result(&res), addr)
+            .await?;
+        let conn = res?;
 
         self.connect_handler
             .start_listening(&mut self.inner, conn)

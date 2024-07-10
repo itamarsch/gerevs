@@ -35,8 +35,14 @@ impl Connect<()> for TunnelConnect {
     where
         T: tokio::io::AsyncWrite + tokio::io::AsyncRead + Send + Unpin,
     {
-        tokio::io::copy_bidirectional(client, &mut server)
+        let res = tokio::io::copy_bidirectional(client, &mut server)
             .await
-            .map(|_| ())
+            .map(|_| ());
+        if let Err(err) = &res {
+            if matches!(err.kind(), io::ErrorKind::NotConnected) {
+                return Ok(());
+            }
+        }
+        res
     }
 }
