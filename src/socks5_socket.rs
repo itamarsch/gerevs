@@ -1,5 +1,5 @@
 use std::{
-    io::{self},
+    io,
     marker::PhantomData,
     net::{Ipv4Addr, Ipv6Addr},
     pin::Pin,
@@ -8,31 +8,61 @@ use std::{
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-use crate::auth::Authenticator;
+use crate::{auth::Authenticator, method_handlers::Connect};
 
 use crate::protocol::{
     Addr, AddressType, AuthMethod, Command, Reply, SocksSocketAddr, RESERVED, VERSION,
 };
 
-pub struct Sock5Socket<T, C, A> {
+pub struct Sock5Socket<T, Credentials, A, Connect> {
     inner: T,
     authenticator: A,
-    phantom_data: PhantomData<C>,
+    phantom_data: PhantomData<Credentials>,
+    connect_handler: Connect,
 }
 
-impl<T, Credentials, A> Sock5Socket<T, Credentials, A>
+impl<T, Credentials, Auth, C> Sock5Socket<T, Credentials, Auth, C>
 where
     Self: Unpin + Send,
     T: AsyncRead + AsyncWrite + Unpin + Send,
-    A: Authenticator<T, Credentials> + Unpin,
+    Auth: Authenticator<T, Credentials> + Unpin,
     Credentials: Unpin,
+    C: Connect<Credentials> + Unpin,
 {
-    pub fn new(inner: T, authenticator: A) -> Self {
+    pub fn new(inner: T, authenticator: Auth, connect_handler: C) -> Self {
         Self {
             inner,
             authenticator,
             phantom_data: PhantomData,
+            connect_handler,
         }
+    }
+    pub async fn connect(
+        &mut self,
+        addr: SocksSocketAddr,
+        credntials: Credentials,
+    ) -> io::Result<()> {
+        let res = self
+            .connect_handler
+            .establish_connection(addr.clone(), credntials)
+            .await;
+
+        let conn = match res {
+            Ok(conn) => {
+                self.write_connect_reponse(Reply::Success, addr).await?;
+                conn
+            }
+            Err(err) => {
+                self.write_connect_reponse(err.kind().into(), addr).await?;
+                return Err(err);
+            }
+        };
+
+        self.connect_handler
+            .start_listening(&mut self.inner, conn)
+            .await?;
+
+        Ok(())
     }
     pub async fn socks_request(&mut self) -> io::Result<(Command, SocksSocketAddr, Credentials)> {
         let credentials = self.authenticate().await?;
@@ -103,9 +133,7 @@ where
 
     async fn parse_request(&mut self) -> io::Result<(Command, AddressType)> {
         let mut request: [u8; 4] = [0; 4];
-        println!("Hello");
         self.read_exact(&mut request).await?;
-        println!("COmmand: {:?}", request);
         assert_eq!(request[0], VERSION);
         assert_eq!(request[2], RESERVED);
         let command = Command::from_u8(request[1]);
@@ -139,11 +167,12 @@ where
     }
 }
 
-impl<T, C, A> AsyncRead for Sock5Socket<T, C, A>
+impl<T, C, A, B> AsyncRead for Sock5Socket<T, C, A, B>
 where
     T: AsyncRead + Unpin,
     C: Unpin,
     A: Unpin,
+    B: Unpin,
 {
     fn poll_read(
         mut self: std::pin::Pin<&mut Self>,
@@ -154,11 +183,12 @@ where
     }
 }
 
-impl<T, C, A> AsyncWrite for Sock5Socket<T, C, A>
+impl<T, C, A, B> AsyncWrite for Sock5Socket<T, C, A, B>
 where
     T: AsyncWrite + Unpin,
     C: Unpin,
     A: Unpin,
+    B: Unpin,
 {
     fn poll_write(
         mut self: Pin<&mut Self>,
