@@ -1,3 +1,5 @@
+use std::io;
+
 #[repr(u8)]
 #[derive(Debug, Clone, Copy)]
 pub enum Reply {
@@ -31,4 +33,37 @@ impl Reply {
     pub fn to_u8(&self) -> u8 {
         *self as u8
     }
+}
+
+impl From<io::ErrorKind> for Reply {
+    fn from(error_kind: io::ErrorKind) -> Self {
+        match error_kind {
+            // Stable variants
+            io::ErrorKind::NotFound => Reply::HostUnreachable, // Assuming HostUnreachable for file not found
+            io::ErrorKind::PermissionDenied => Reply::ConnectionNotAllowedByRuleset,
+            io::ErrorKind::ConnectionRefused => Reply::ConnectionRefused,
+            io::ErrorKind::ConnectionReset => Reply::TTLExpired, // Assuming TTLExpired for connection reset
+            io::ErrorKind::ConnectionAborted => Reply::TTLExpired, // Assuming TTLExpired for connection aborted
+            io::ErrorKind::NotConnected => Reply::NetworkUnreachable, // Assuming NetworkUnreachable for not connected
+            io::ErrorKind::AddrInUse => Reply::HostUnreachable, // Assuming HostUnreachable for address in use
+            io::ErrorKind::AddrNotAvailable => Reply::AddressTypeNotSupported,
+            io::ErrorKind::BrokenPipe => Reply::TTLExpired, // Assuming TTLExpired for broken pipe
+            io::ErrorKind::AlreadyExists => Reply::HostUnreachable, // Assuming HostUnreachable for already exists
+            io::ErrorKind::WouldBlock => Reply::HostUnreachable, // Assuming HostUnreachable for would block
+            io::ErrorKind::InvalidInput => Reply::HostUnreachable, // Assuming HostUnreachable for invalid input
+            io::ErrorKind::InvalidData => Reply::HostUnreachable, // Assuming HostUnreachable for invalid data
+            io::ErrorKind::TimedOut => Reply::TTLExpired,
+            io::ErrorKind::WriteZero => Reply::HostUnreachable, // Assuming HostUnreachable for write zero
+            io::ErrorKind::Interrupted => Reply::HostUnreachable, // Assuming HostUnreachable for interrupted
+            io::ErrorKind::Unsupported => Reply::CommandNotSupported,
+            io::ErrorKind::UnexpectedEof => Reply::HostUnreachable, // Assuming HostUnreachable for unexpected EOF
+            _ => Reply::GeneralFailure,
+        }
+    }
+}
+
+fn main() {
+    let error_kind = io::ErrorKind::ConnectionRefused;
+    let reply: Reply = error_kind.into();
+    println!("Reply code: {:?}", reply as u8);
 }

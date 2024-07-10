@@ -35,25 +35,10 @@ where
         }
     }
     pub async fn socks_request(&mut self) -> io::Result<(Command, SocksSocketAddr, Credentials)> {
-        let methods = self.parse_methods().await?;
-
-        let method = self.authenticator.select_method(&methods);
-        self.write_auth_method(method).await?;
-
-        let credentials = match self.authenticator.authenticate(&mut self.inner).await {
-            Ok(Some(credentials)) => credentials,
-            _ => {
-                return Err(io::ErrorKind::InvalidInput.into());
-            }
-        };
-        println!("Credentials");
+        let credentials = self.authenticate().await?;
 
         let (command, addr_type) = self.parse_request().await?;
         let addr = self.parse_addr(addr_type).await?;
-        println!(
-            "Methods {:?}, Command: {:?}, AddrType: {:?}, Addr: {:?}",
-            methods, command, addr_type, addr
-        );
 
         Ok((command, addr, credentials))
     }
@@ -72,6 +57,25 @@ where
         self.write_all(&bnd_address.to_bytes()).await?;
 
         Ok(())
+    }
+
+    async fn authenticate(&mut self) -> io::Result<Credentials> {
+        let methods = self.parse_methods().await?;
+
+        let method = self.authenticator.select_method(&methods);
+        self.write_auth_method(method).await?;
+
+        let credentials = match self.authenticator.authenticate(&mut self.inner).await {
+            Ok(Some(credentials)) => credentials,
+
+            Ok(None) => {
+                return Err(io::ErrorKind::InvalidInput.into());
+            }
+            Err(err) => {
+                return Err(err);
+            }
+        };
+        Ok(credentials)
     }
 
     async fn write_auth_method(&mut self, auth_method: AuthMethod) -> io::Result<()> {
@@ -99,7 +103,9 @@ where
 
     async fn parse_request(&mut self) -> io::Result<(Command, AddressType)> {
         let mut request: [u8; 4] = [0; 4];
+        println!("Hello");
         self.read_exact(&mut request).await?;
+        println!("COmmand: {:?}", request);
         assert_eq!(request[0], VERSION);
         assert_eq!(request[2], RESERVED);
         let command = Command::from_u8(request[1]);
