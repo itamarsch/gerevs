@@ -10,6 +10,7 @@ use crate::{
     Socks5Error,
 };
 
+pub mod bind_denier;
 pub mod tunnel_bind;
 
 pub trait Bind<C> {

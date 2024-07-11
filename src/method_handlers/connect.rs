@@ -1,4 +1,5 @@
 use tokio::io::{AsyncRead, AsyncWrite};
+pub mod connect_denier;
 pub mod tunnel_connect;
 use crate::protocol::SocksSocketAddr;
 
