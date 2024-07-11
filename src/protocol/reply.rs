@@ -1,4 +1,4 @@
-use std::io;
+use std::{fmt, io};
 
 #[repr(u8)]
 #[derive(Debug, Clone, Copy)]
@@ -13,6 +13,25 @@ pub enum Reply {
     CommandNotSupported = 0x07,
     AddressTypeNotSupported = 0x08,
 }
+
+impl fmt::Display for Reply {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let description = match self {
+            Reply::Success => "Success",
+            Reply::GeneralFailure => "General Failure",
+            Reply::ConnectionNotAllowedByRuleset => "Connection Not Allowed By Ruleset",
+            Reply::NetworkUnreachable => "Network Unreachable",
+            Reply::HostUnreachable => "Host Unreachable",
+            Reply::ConnectionRefused => "Connection Refused",
+            Reply::TTLExpired => "TTL Expired",
+            Reply::CommandNotSupported => "Command Not Supported",
+            Reply::AddressTypeNotSupported => "Address Type Not Supported",
+        };
+        write!(f, "{}", description)
+    }
+}
+
+impl std::error::Error for Reply {}
 
 impl Reply {
     pub fn from_u8(value: u8) -> Self {

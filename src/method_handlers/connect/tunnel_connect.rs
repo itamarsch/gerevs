@@ -18,8 +18,8 @@ impl Connect<()> for TunnelConnect {
         &mut self,
         addr: SocksSocketAddr,
         _credentials: (),
-    ) -> std::io::Result<TcpStream> {
-        match addr.addr {
+    ) -> crate::Result<TcpStream> {
+        let res = match addr.addr {
             Addr::Ipv4(addrv4) => TcpStream::connect(SocketAddrV4::new(addrv4, addr.port)).await,
             Addr::Ipv6(addrv6) => {
                 TcpStream::connect(SocketAddrV6::new(addrv6, addr.port, 0, 0)).await
@@ -28,10 +28,15 @@ impl Connect<()> for TunnelConnect {
                 let domain = format!("{}:{}", domain, addr.port);
                 TcpStream::connect(domain).await
             }
-        }
+        }?;
+        Ok(res)
     }
 
-    async fn start_listening<T>(&mut self, client: &mut T, mut server: TcpStream) -> io::Result<()>
+    async fn start_listening<T>(
+        &mut self,
+        client: &mut T,
+        mut server: TcpStream,
+    ) -> crate::Result<()>
     where
         T: tokio::io::AsyncWrite + tokio::io::AsyncRead + Send + Unpin,
     {
@@ -43,6 +48,7 @@ impl Connect<()> for TunnelConnect {
                 return Ok(());
             }
         }
-        res
+        res?;
+        Ok(())
     }
 }

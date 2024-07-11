@@ -8,12 +8,13 @@ impl Bind<()> for TunnelBind {
         server: &mut T,
         mut client: tokio::net::TcpStream,
         _: (),
-    ) -> std::io::Result<()>
+    ) -> crate::Result<()>
     where
         T: tokio::io::AsyncWrite + tokio::io::AsyncRead + Send + Unpin,
     {
         tokio::io::copy_bidirectional(server, &mut client)
             .await
-            .map(|_| ())
+            .map(|_| ())?;
+        Ok(())
     }
 }

@@ -3,7 +3,7 @@ use gerev::{
     method_handlers::{TunnelBind, TunnelConnect},
     socks5_socket::Sock5Socket,
 };
-use std::{error::Error, io};
+use std::error::Error;
 use tokio::net::{TcpListener, TcpStream};
 
 #[tokio::main]
@@ -22,7 +22,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     }
 }
 
-async fn handle_connection(client: TcpStream) -> io::Result<()> {
+async fn handle_connection(client: TcpStream) -> gerev::Result<()> {
     let mut sock5_stream = Sock5Socket::new(client, NoAuthAuthenticator, TunnelConnect, TunnelBind);
     let (command, addr, credentials) = sock5_stream.socks_request().await?;
     println!("Connection, addr: {:?}", addr);

@@ -26,6 +26,15 @@ pub struct SocksSocketAddr {
     pub port: u16,
     pub addr: Addr,
 }
+impl Default for SocksSocketAddr {
+    fn default() -> Self {
+        Self {
+            port: 0,
+            addr: Addr::Ipv4(Ipv4Addr::from([0; 4])),
+        }
+    }
+}
+
 impl SocksSocketAddr {
     /// Turns `Self` into: AddrType+ADDR+PORT
     pub fn to_bytes(&self) -> Vec<u8> {

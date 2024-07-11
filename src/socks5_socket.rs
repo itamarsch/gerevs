@@ -1,19 +1,17 @@
 use std::{
     io,
     marker::PhantomData,
-    net::{Ipv4Addr, Ipv6Addr, SocketAddrV4},
+    net::{Ipv4Addr, Ipv6Addr},
     pin::Pin,
 };
 
+use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::{
-    io::{AsyncRead, AsyncWrite},
-    net::TcpListener,
-};
 
 use crate::{
     auth::Authenticator,
     method_handlers::{Bind, Connect},
+    Socks5Error,
 };
 
 use crate::protocol::{
@@ -50,36 +48,30 @@ where
         &mut self,
         addr: SocksSocketAddr,
         credentials: Credentials,
-    ) -> io::Result<()> {
-        let res = match addr.addr {
-            Addr::Ipv4(addrv4) => TcpListener::bind(SocketAddrV4::new(addrv4, addr.port)).await,
-            Addr::Ipv6(addrv6) => {
-                TcpListener::bind(std::net::SocketAddrV6::new(addrv6, addr.port, 0, 0)).await
-            }
-            Addr::Domain(ref domain) => {
-                let domain = format!("{}:{}", domain, addr.port);
-                TcpListener::bind(domain).await
-            }
+    ) -> crate::Result<()> {
+        let bind_inner = || async {
+            let server = self.bind_handler.bind(addr, &credentials).await?;
+
+            let localaddr = server
+                .local_addr()
+                .map_err(|err| crate::Socks5Error::Socks5Error(err.kind().into()))?;
+
+            self.reply(Reply::Success, localaddr.into()).await?;
+
+            let (client, client_addr) = self.bind_handler.accept(server, &credentials).await?;
+
+            self.reply(Reply::Success, client_addr.into()).await?;
+
+            self.bind_handler
+                .start_listening(&mut self.inner, client, credentials)
+                .await?;
+            Ok(())
         };
 
-        let server: TcpListener = self.write_on_error(res).await?;
-
-        let localaddr = server.local_addr()?;
-        println!("Localaddr: {:?}", localaddr);
-
-        self.write_connect_reponse(Reply::Success, localaddr.into())
-            .await?;
-
-        let res = server.accept().await;
-
-        let (client, client_addr) = self.write_on_error(res).await?;
-
-        self.write_connect_reponse(Reply::Success, client_addr.into())
-            .await?;
-
-        self.bind_handler
-            .start_listening(&mut self.inner, client, credentials)
-            .await?;
+        let res: crate::Result<_> = bind_inner().await;
+        if let Err(Socks5Error::Socks5Error(err)) = res {
+            self.reply(err, Default::default()).await?;
+        }
         Ok(())
     }
 
@@ -87,20 +79,26 @@ where
         &mut self,
         addr: SocksSocketAddr,
         credntials: Credentials,
-    ) -> io::Result<()> {
-        let res = self
-            .connect_handler
-            .establish_connection(addr.clone(), credntials)
-            .await;
+    ) -> crate::Result<()> {
+        let connect_inner = || async {
+            let conn = self
+                .connect_handler
+                .establish_connection(addr.clone(), credntials)
+                .await?;
 
-        self.write_connect_reponse(Reply::from_io_result(&res), addr)
-            .await?;
-        let conn = res?;
+            self.reply(Reply::Success, addr).await?;
 
-        self.connect_handler
-            .start_listening(&mut self.inner, conn)
-            .await?;
+            self.connect_handler
+                .start_listening(&mut self.inner, conn)
+                .await?;
 
+            Ok(())
+        };
+
+        let res: crate::Result<_> = connect_inner().await;
+        if let Err(Socks5Error::Socks5Error(err)) = res {
+            self.reply(err, Default::default()).await?;
+        }
         Ok(())
     }
     pub async fn socks_request(&mut self) -> io::Result<(Command, SocksSocketAddr, Credentials)> {
@@ -137,27 +135,7 @@ where
     Self: Unpin + Send,
     T: AsyncRead + AsyncWrite + Unpin + Send,
 {
-    pub async fn write_on_error<A>(&mut self, res: io::Result<A>) -> io::Result<A> {
-        let zero_addr = SocksSocketAddr {
-            port: 0,
-            addr: Addr::Ipv4(Ipv4Addr::from([0; 4])),
-        };
-
-        match res {
-            Ok(server) => Ok(server),
-            Err(err) => {
-                self.write_connect_reponse(err.kind().into(), zero_addr)
-                    .await?;
-                Err(err)
-            }
-        }
-    }
-
-    pub async fn write_connect_reponse(
-        &mut self,
-        reply: Reply,
-        bnd_address: SocksSocketAddr,
-    ) -> io::Result<()> {
+    pub async fn reply(&mut self, reply: Reply, bnd_address: SocksSocketAddr) -> io::Result<()> {
         self.write_u8(VERSION).await?;
 
         self.write_u8(reply.to_u8()).await?;
