@@ -1,42 +1,88 @@
 use std::{
     io,
     marker::PhantomData,
-    net::{Ipv4Addr, Ipv6Addr},
+    net::{Ipv4Addr, Ipv6Addr, SocketAddrV4},
     pin::Pin,
 };
 
-use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::{
+    io::{AsyncRead, AsyncWrite},
+    net::TcpListener,
+};
 
-use crate::{auth::Authenticator, method_handlers::Connect};
+use crate::{
+    auth::Authenticator,
+    method_handlers::{Bind, Connect},
+};
 
 use crate::protocol::{
     Addr, AddressType, AuthMethod, Command, Reply, SocksSocketAddr, RESERVED, VERSION,
 };
 
-pub struct Sock5Socket<T, Credentials, A, Connect> {
+pub struct Sock5Socket<T, Credentials, A, Connect, Bind> {
     inner: T,
     authenticator: A,
     phantom_data: PhantomData<Credentials>,
     connect_handler: Connect,
+    bind_handler: Bind,
 }
 
-impl<T, Credentials, Auth, C> Sock5Socket<T, Credentials, Auth, C>
+impl<T, Credentials, Auth, C, B> Sock5Socket<T, Credentials, Auth, C, B>
 where
     Self: Unpin + Send,
     T: AsyncRead + AsyncWrite + Unpin + Send,
-    Auth: Authenticator<T, Credentials> + Unpin,
-    Credentials: Unpin,
-    C: Connect<Credentials> + Unpin,
+    Auth: Authenticator<T, Credentials>,
+    C: Connect<Credentials>,
+    B: Bind<Credentials>,
 {
-    pub fn new(inner: T, authenticator: Auth, connect_handler: C) -> Self {
+    pub fn new(inner: T, authenticator: Auth, connect_handler: C, bind_handler: B) -> Self {
         Self {
             inner,
             authenticator,
             phantom_data: PhantomData,
             connect_handler,
+            bind_handler,
         }
     }
+
+    pub async fn bind(
+        &mut self,
+        addr: SocksSocketAddr,
+        credentials: Credentials,
+    ) -> io::Result<()> {
+        let res = match addr.addr {
+            Addr::Ipv4(addrv4) => TcpListener::bind(SocketAddrV4::new(addrv4, addr.port)).await,
+            Addr::Ipv6(addrv6) => {
+                TcpListener::bind(std::net::SocketAddrV6::new(addrv6, addr.port, 0, 0)).await
+            }
+            Addr::Domain(ref domain) => {
+                let domain = format!("{}:{}", domain, addr.port);
+                TcpListener::bind(domain).await
+            }
+        };
+
+        let server: TcpListener = self.write_on_error(res).await?;
+
+        let localaddr = server.local_addr()?;
+        println!("Localaddr: {:?}", localaddr);
+
+        self.write_connect_reponse(Reply::Success, localaddr.into())
+            .await?;
+
+        let res = server.accept().await;
+
+        let (client, client_addr) = self.write_on_error(res).await?;
+
+        self.write_connect_reponse(Reply::Success, client_addr.into())
+            .await?;
+
+        self.bind_handler
+            .start_listening(&mut self.inner, client, credentials)
+            .await?;
+        Ok(())
+    }
+
     pub async fn connect(
         &mut self,
         addr: SocksSocketAddr,
@@ -66,22 +112,6 @@ where
         Ok((command, addr, credentials))
     }
 
-    pub async fn write_connect_reponse(
-        &mut self,
-        reply: Reply,
-        bnd_address: SocksSocketAddr,
-    ) -> io::Result<()> {
-        self.write_u8(VERSION).await?;
-
-        self.write_u8(reply.to_u8()).await?;
-
-        self.write_u8(RESERVED).await?;
-
-        self.write_all(&bnd_address.to_bytes()).await?;
-
-        Ok(())
-    }
-
     async fn authenticate(&mut self) -> io::Result<Credentials> {
         let methods = self.parse_methods().await?;
 
@@ -99,6 +129,44 @@ where
             }
         };
         Ok(credentials)
+    }
+}
+
+impl<T, Credentials, Auth, C, B> Sock5Socket<T, Credentials, Auth, C, B>
+where
+    Self: Unpin + Send,
+    T: AsyncRead + AsyncWrite + Unpin + Send,
+{
+    pub async fn write_on_error<A>(&mut self, res: io::Result<A>) -> io::Result<A> {
+        let zero_addr = SocksSocketAddr {
+            port: 0,
+            addr: Addr::Ipv4(Ipv4Addr::from([0; 4])),
+        };
+
+        match res {
+            Ok(server) => Ok(server),
+            Err(err) => {
+                self.write_connect_reponse(err.kind().into(), zero_addr)
+                    .await?;
+                Err(err)
+            }
+        }
+    }
+
+    pub async fn write_connect_reponse(
+        &mut self,
+        reply: Reply,
+        bnd_address: SocksSocketAddr,
+    ) -> io::Result<()> {
+        self.write_u8(VERSION).await?;
+
+        self.write_u8(reply.to_u8()).await?;
+
+        self.write_u8(RESERVED).await?;
+
+        self.write_all(&bnd_address.to_bytes()).await?;
+
+        Ok(())
     }
 
     async fn write_auth_method(&mut self, auth_method: AuthMethod) -> io::Result<()> {
@@ -160,12 +228,11 @@ where
     }
 }
 
-impl<T, C, A, B> AsyncRead for Sock5Socket<T, C, A, B>
+impl<T, Credentials, Auth, Connect, Bind> AsyncRead
+    for Sock5Socket<T, Credentials, Auth, Connect, Bind>
 where
+    Self: Unpin,
     T: AsyncRead + Unpin,
-    C: Unpin,
-    A: Unpin,
-    B: Unpin,
 {
     fn poll_read(
         mut self: std::pin::Pin<&mut Self>,
@@ -176,12 +243,11 @@ where
     }
 }
 
-impl<T, C, A, B> AsyncWrite for Sock5Socket<T, C, A, B>
+impl<T, Credentials, Auth, Connect, Bind> AsyncWrite
+    for Sock5Socket<T, Credentials, Auth, Connect, Bind>
 where
+    Self: Unpin,
     T: AsyncWrite + Unpin,
-    C: Unpin,
-    A: Unpin,
-    B: Unpin,
 {
     fn poll_write(
         mut self: Pin<&mut Self>,
