@@ -1,6 +1,5 @@
 use std::{
     io,
-    marker::PhantomData,
     net::{Ipv4Addr, Ipv6Addr},
     pin::Pin,
 };
@@ -18,27 +17,25 @@ use crate::protocol::{
     Addr, AddressType, AuthMethod, Command, Reply, SocksSocketAddr, RESERVED, VERSION,
 };
 
-pub struct Sock5Socket<T, Credentials, A, Connect, Bind> {
+pub struct Sock5Socket<T, A, Connect, Bind> {
     inner: T,
     authenticator: A,
-    phantom_data: PhantomData<Credentials>,
     connect_handler: Connect,
     bind_handler: Bind,
 }
 
-impl<T, Credentials, Auth, C, B> Sock5Socket<T, Credentials, Auth, C, B>
+impl<T, Auth, C, B> Sock5Socket<T, Auth, C, B>
 where
     Self: Unpin + Send,
     T: AsyncRead + AsyncWrite + Unpin + Send,
-    Auth: Authenticator<T, Credentials>,
-    C: Connect<Credentials>,
-    B: Bind<Credentials>,
+    Auth: Authenticator<T>,
+    C: Connect<Auth::Credentials>,
+    B: Bind<Auth::Credentials>,
 {
     pub fn new(inner: T, authenticator: Auth, connect_handler: C, bind_handler: B) -> Self {
         Self {
             inner,
             authenticator,
-            phantom_data: PhantomData,
             connect_handler,
             bind_handler,
         }
@@ -47,7 +44,7 @@ where
     pub async fn bind(
         &mut self,
         addr: SocksSocketAddr,
-        credentials: Credentials,
+        credentials: Auth::Credentials,
     ) -> crate::Result<()> {
         let bind_inner = || async {
             let server = self.bind_handler.bind(addr, &credentials).await?;
@@ -78,7 +75,7 @@ where
     pub async fn connect(
         &mut self,
         addr: SocksSocketAddr,
-        credntials: Credentials,
+        credntials: Auth::Credentials,
     ) -> crate::Result<()> {
         let connect_inner = || async {
             let conn = self
@@ -101,7 +98,9 @@ where
         }
         Ok(())
     }
-    pub async fn socks_request(&mut self) -> io::Result<(Command, SocksSocketAddr, Credentials)> {
+    pub async fn socks_request(
+        &mut self,
+    ) -> io::Result<(Command, SocksSocketAddr, Auth::Credentials)> {
         let credentials = self.authenticate().await?;
 
         let (command, addr_type) = self.parse_request().await?;
@@ -110,7 +109,7 @@ where
         Ok((command, addr, credentials))
     }
 
-    async fn authenticate(&mut self) -> io::Result<Credentials> {
+    async fn authenticate(&mut self) -> io::Result<Auth::Credentials> {
         let methods = self.parse_methods().await?;
 
         let method = self.authenticator.select_method(&methods);
@@ -130,7 +129,7 @@ where
     }
 }
 
-impl<T, Credentials, Auth, C, B> Sock5Socket<T, Credentials, Auth, C, B>
+impl<T, Auth, C, B> Sock5Socket<T, Auth, C, B>
 where
     Self: Unpin + Send,
     T: AsyncRead + AsyncWrite + Unpin + Send,
@@ -206,8 +205,7 @@ where
     }
 }
 
-impl<T, Credentials, Auth, Connect, Bind> AsyncRead
-    for Sock5Socket<T, Credentials, Auth, Connect, Bind>
+impl<T, Auth, Connect, Bind> AsyncRead for Sock5Socket<T, Auth, Connect, Bind>
 where
     Self: Unpin,
     T: AsyncRead + Unpin,
@@ -221,8 +219,7 @@ where
     }
 }
 
-impl<T, Credentials, Auth, Connect, Bind> AsyncWrite
-    for Sock5Socket<T, Credentials, Auth, Connect, Bind>
+impl<T, Auth, Connect, Bind> AsyncWrite for Sock5Socket<T, Auth, Connect, Bind>
 where
     Self: Unpin,
     T: AsyncWrite + Unpin,

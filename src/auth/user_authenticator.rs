@@ -36,12 +36,14 @@ where
     user_validator: U,
 }
 
-impl<T, R, U> Authenticator<T, R> for UserAuthenticator<R, U>
+impl<T, R, U> Authenticator<T> for UserAuthenticator<R, U>
 where
     T: AsyncRead + AsyncWrite + Unpin + Send,
     R: Send + Sync,
     U: UserValidator<R> + Send + Sync,
 {
+    type Credentials = R;
+
     async fn authenticate(&mut self, conn: &mut T) -> io::Result<Option<R>> {
         let user = self.get_user(conn).await?;
 

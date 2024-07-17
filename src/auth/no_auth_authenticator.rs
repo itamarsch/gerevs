@@ -8,10 +8,12 @@ use super::Authenticator;
 
 pub struct NoAuthAuthenticator;
 
-impl<T> Authenticator<T, ()> for NoAuthAuthenticator
+impl<T> Authenticator<T> for NoAuthAuthenticator
 where
     T: AsyncRead + AsyncWrite + Unpin + Send,
 {
+    type Credentials = ();
+
     async fn authenticate(&mut self, _: &mut T) -> io::Result<Option<()>> {
         Ok(Some(()))
     }
