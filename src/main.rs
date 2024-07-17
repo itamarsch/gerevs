@@ -1,4 +1,4 @@
-use gerev::{
+use gerevs::{
     auth::no_auth_authenticator::NoAuthAuthenticator,
     method_handlers::{BindDenier, TunnelConnect},
     socks5_socket::Sock5Socket,
@@ -22,14 +22,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
     }
 }
 
-async fn handle_connection(client: TcpStream) -> gerev::Result<()> {
+async fn handle_connection(client: TcpStream) -> gerevs::Result<()> {
     let mut sock5_stream = Sock5Socket::new(client, NoAuthAuthenticator, TunnelConnect, BindDenier);
     let (command, addr, credentials) = sock5_stream.socks_request().await?;
     println!("Connection, addr: {:?}", addr);
     match command {
-        gerev::protocol::Command::Connect => sock5_stream.connect(addr, credentials).await?,
-        gerev::protocol::Command::Bind => sock5_stream.bind(addr, credentials).await?,
-        gerev::protocol::Command::UdpAssociate => todo!(),
+        gerevs::protocol::Command::Connect => sock5_stream.connect(addr, credentials).await?,
+        gerevs::protocol::Command::Bind => sock5_stream.bind(addr, credentials).await?,
+        gerevs::protocol::Command::UdpAssociate => todo!(),
     }
 
     Ok(())
