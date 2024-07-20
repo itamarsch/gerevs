@@ -1,4 +1,9 @@
-use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr};
+use std::{
+    io,
+    net::{Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6, ToSocketAddrs},
+};
+
+use tokio::io::{AsyncRead, AsyncReadExt};
 
 #[derive(Debug, Clone, Copy)]
 pub enum AddressType {
@@ -36,6 +41,47 @@ impl Default for SocksSocketAddr {
 }
 
 impl SocksSocketAddr {
+    pub fn to_socket_addr(&self) -> io::Result<SocketAddr> {
+        match self.addr {
+            Addr::Ipv4(addrv4) => Ok(SocketAddrV4::new(addrv4, self.port).into()),
+            Addr::Ipv6(addrv6) => Ok(SocketAddrV6::new(addrv6, self.port, 0, 0).into()),
+            Addr::Domain(ref domain) => {
+                let domain = format!("{}:{}", domain, self.port);
+                domain.to_socket_addrs()?.next().ok_or(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    "Unable to resolve domain",
+                ))
+            }
+        }
+    }
+    pub async fn read<T>(stream: &mut T) -> io::Result<Self>
+    where
+        T: AsyncRead + Unpin,
+    {
+        let address_type = stream.read_u8().await?;
+        let address_type = AddressType::from_u8(address_type);
+        let addr = match address_type {
+            AddressType::Ipv4 => {
+                let mut addr = [0; 4];
+                stream.read_exact(&mut addr).await?;
+                Addr::Ipv4(Ipv4Addr::from(addr))
+            }
+            AddressType::DomainName => {
+                let len = stream.read_u8().await?;
+                let mut domain = vec![0; len as usize];
+                stream.read_exact(&mut domain[..]).await?;
+                let domain = String::from_utf8(domain).map_err(|_| io::ErrorKind::InvalidData)?;
+                Addr::Domain(domain)
+            }
+            AddressType::Ipv6 => {
+                let mut addr = [0; 16];
+                stream.read_exact(&mut addr).await?;
+                Addr::Ipv6(Ipv6Addr::from(addr))
+            }
+        };
+        let port = stream.read_u16().await?;
+        Ok(Self { port, addr })
+    }
     /// Turns `Self` into: AddrType+ADDR+PORT
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut bytes = Vec::with_capacity(18);

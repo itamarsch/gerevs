@@ -25,11 +25,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
 async fn handle_connection(client: TcpStream) -> gerevs::Result<()> {
     let mut sock5_stream = Sock5Socket::new(client, NoAuthAuthenticator, TunnelConnect, BindDenier);
     let (command, addr, credentials) = sock5_stream.socks_request().await?;
-    println!("Connection, addr: {:?}", addr);
+    println!("Connection, addr: {:?}, Command: {:?}", addr, command);
     match command {
         gerevs::protocol::Command::Connect => sock5_stream.connect(addr, credentials).await?,
         gerevs::protocol::Command::Bind => sock5_stream.bind(addr, credentials).await?,
-        gerevs::protocol::Command::UdpAssociate => todo!(),
+        gerevs::protocol::Command::UdpAssociate => {
+            sock5_stream.associate(addr, credentials).await?
+        }
     }
 
     Ok(())

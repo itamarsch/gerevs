@@ -19,16 +19,7 @@ impl Connect<()> for TunnelConnect {
         addr: SocksSocketAddr,
         _credentials: (),
     ) -> crate::Result<TcpStream> {
-        let res = match addr.addr {
-            Addr::Ipv4(addrv4) => TcpStream::connect(SocketAddrV4::new(addrv4, addr.port)).await,
-            Addr::Ipv6(addrv6) => {
-                TcpStream::connect(SocketAddrV6::new(addrv6, addr.port, 0, 0)).await
-            }
-            Addr::Domain(ref domain) => {
-                let domain = format!("{}:{}", domain, addr.port);
-                TcpStream::connect(domain).await
-            }
-        }?;
+        let res = TcpStream::connect(addr.to_socket_addr()?).await?;
         Ok(res)
     }
 

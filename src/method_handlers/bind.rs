@@ -18,19 +18,11 @@ pub trait Bind<C> {
         &mut self,
         addr: SocksSocketAddr,
         _: &C,
-    ) -> impl std::future::Future<Output = crate::Result<TcpListener>> + Send {
+    ) -> impl std::future::Future<Output = crate::Result<TcpListener>> {
         async move {
-            match addr.addr {
-                Addr::Ipv4(addrv4) => TcpListener::bind(SocketAddrV4::new(addrv4, addr.port)).await,
-                Addr::Ipv6(addrv6) => {
-                    TcpListener::bind(std::net::SocketAddrV6::new(addrv6, addr.port, 0, 0)).await
-                }
-                Addr::Domain(ref domain) => {
-                    let domain = format!("{}:{}", domain, addr.port);
-                    TcpListener::bind(domain).await
-                }
-            }
-            .map_err(|err| crate::Socks5Error::Socks5Error(err.kind().into()))
+            TcpListener::bind(addr.to_socket_addr()?)
+                .await
+                .map_err(|err| crate::Socks5Error::Socks5Error(err.kind().into()))
         }
     }
 

@@ -1,11 +1,14 @@
 use std::{
-    io,
-    net::{Ipv4Addr, Ipv6Addr},
+    io::{self, Cursor},
+    net::{Ipv4Addr, Ipv6Addr, SocketAddrV4},
     pin::Pin,
 };
 
-use tokio::io::{AsyncRead, AsyncWrite};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt, BufReader};
+use tokio::{
+    io::{AsyncRead, AsyncWrite},
+    net::UdpSocket,
+};
 
 use crate::{
     auth::Authenticator,
@@ -98,13 +101,62 @@ where
         }
         Ok(())
     }
+
+    pub async fn associate(
+        &mut self,
+        addr: SocksSocketAddr,
+        credntials: Auth::Credentials,
+    ) -> crate::Result<()> {
+        let associate_inner = || async {
+            let listen_addr = addr;
+
+            let udp_listener = UdpSocket::bind("0.0.0.0:0").await?;
+            let peer_host = udp_listener.local_addr()?;
+            self.reply(Reply::Success, peer_host.into()).await?;
+
+            let mut buf = [0; 4096];
+            let (n, source) = udp_listener.recv_from(&mut buf).await?;
+
+            let mut cursor = BufReader::new(Cursor::new(&buf[..n]));
+            let reserved = cursor.read_u16().await?;
+            let fragment = cursor.read_u8().await?;
+            let addr = SocksSocketAddr::read(&mut cursor).await?;
+
+            println!("{:?}, {:?}, {:?}", reserved, fragment, addr);
+
+            let current_pos = cursor.stream_position().await? as usize;
+            let data = &buf[current_pos..n];
+            println!("{}", String::from_utf8(data.to_owned()).unwrap());
+
+            udp_listener.send_to(data, addr.to_socket_addr()?).await?;
+
+            let (n, res_addr) = udp_listener.recv_from(&mut buf).await?;
+
+            let mut res: Vec<u8> = Vec::with_capacity(n + 10);
+
+            res.extend_from_slice(&[0, 0]);
+            res.push(0);
+            res.extend(SocksSocketAddr::from(peer_host).to_bytes());
+            res.extend_from_slice(&buf[..n]);
+
+            udp_listener.send_to(&res[..], source).await?;
+
+            Ok(())
+        };
+
+        let res: crate::Result<_> = associate_inner().await;
+        if let Err(Socks5Error::Socks5Error(err)) = res {
+            self.reply(err, Default::default()).await?;
+        }
+        Ok(())
+    }
     pub async fn socks_request(
         &mut self,
     ) -> io::Result<(Command, SocksSocketAddr, Auth::Credentials)> {
         let credentials = self.authenticate().await?;
 
-        let (command, addr_type) = self.parse_request().await?;
-        let addr = self.parse_addr(addr_type).await?;
+        let command = self.parse_request().await?;
+        let addr = self.parse_addr().await?;
 
         Ok((command, addr, credentials))
     }
@@ -169,39 +221,17 @@ where
         Ok(methods)
     }
 
-    async fn parse_request(&mut self) -> io::Result<(Command, AddressType)> {
-        let mut request: [u8; 4] = [0; 4];
+    async fn parse_request(&mut self) -> io::Result<Command> {
+        let mut request: [u8; 3] = [0; 3];
         self.read_exact(&mut request).await?;
         assert_eq!(request[0], VERSION);
         assert_eq!(request[2], RESERVED);
         let command = Command::from_u8(request[1]);
-        let addr_type = AddressType::from_u8(request[3]);
-        Ok((command, addr_type))
+        Ok(command)
     }
 
-    async fn parse_addr(&mut self, address: AddressType) -> io::Result<SocksSocketAddr> {
-        let addr = match address {
-            AddressType::Ipv4 => {
-                let mut addr = [0; 4];
-                self.read_exact(&mut addr).await?;
-                Addr::Ipv4(Ipv4Addr::from(addr))
-            }
-            AddressType::DomainName => {
-                let len = self.read_u8().await?;
-                let mut domain = vec![0; len as usize];
-                self.read_exact(&mut domain[..]).await?;
-                let domain = String::from_utf8(domain).map_err(|_| io::ErrorKind::InvalidData)?;
-                Addr::Domain(domain)
-            }
-            AddressType::Ipv6 => {
-                let mut addr = [0; 16];
-                self.read_exact(&mut addr).await?;
-                Addr::Ipv6(Ipv6Addr::from(addr))
-            }
-        };
-        let port = self.read_u16().await?;
-
-        Ok(SocksSocketAddr { port, addr })
+    async fn parse_addr(&mut self) -> io::Result<SocksSocketAddr> {
+        SocksSocketAddr::read(self).await
     }
 }
 
