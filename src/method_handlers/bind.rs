@@ -17,7 +17,7 @@ pub trait Bind<C> {
         _: &C,
     ) -> impl std::future::Future<Output = crate::Result<TcpListener>> {
         async move {
-            TcpListener::bind(addr.to_socket_addr().await?)
+            TcpListener::bind(&*addr.to_socket_addr().await?)
                 .await
                 .map_err(|err| crate::Socks5Error::Socks5Error(err.kind().into()))
         }

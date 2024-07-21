@@ -16,7 +16,7 @@ impl Connect<()> for TunnelConnect {
         addr: SocksSocketAddr,
         _credentials: (),
     ) -> crate::Result<TcpStream> {
-        let res = TcpStream::connect(addr.to_socket_addr().await?).await?;
+        let res = TcpStream::connect(&*addr.to_socket_addr().await?).await?;
         Ok(res)
     }
 

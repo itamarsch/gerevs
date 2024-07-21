@@ -126,7 +126,7 @@ where
             println!("{}", String::from_utf8(data.to_owned()).unwrap());
 
             udp_listener
-                .send_to(data, addr.to_socket_addr().await?)
+                .send_to(data, &*addr.to_socket_addr().await?)
                 .await?;
 
             let (n, res_addr) = udp_listener.recv_from(&mut buf).await?;

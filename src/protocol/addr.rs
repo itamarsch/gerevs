@@ -1,6 +1,7 @@
 use std::{
     io,
     net::{Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6, ToSocketAddrs},
+    ops::Deref,
 };
 
 use tokio::{
@@ -44,20 +45,18 @@ impl Default for SocksSocketAddr {
 }
 
 impl SocksSocketAddr {
-    pub async fn to_socket_addr(&self) -> io::Result<SocketAddr> {
+    pub async fn to_socket_addr(&self) -> io::Result<impl Deref<Target = [SocketAddr]>> {
         match self.addr {
-            Addr::Ipv4(addrv4) => Ok(SocketAddrV4::new(addrv4, self.port).into()),
-            Addr::Ipv6(addrv6) => Ok(SocketAddrV6::new(addrv6, self.port, 0, 0).into()),
+            Addr::Ipv4(addrv4) => Ok(vec![SocketAddrV4::new(addrv4, self.port).into()]),
+            Addr::Ipv6(addrv6) => Ok(vec![SocketAddrV6::new(addrv6, self.port, 0, 0).into()]),
             Addr::Domain(ref domain) => {
                 let domain = format!("{}:{}", domain, self.port);
 
-                tokio::task::spawn_blocking(move || {
-                    domain.to_socket_addrs()?.next().ok_or(std::io::Error::new(
-                        std::io::ErrorKind::Other,
-                        "Unable to resolve domain",
-                    ))
-                })
-                .await?
+                Ok(
+                    tokio::task::spawn_blocking(move || domain.to_socket_addrs())
+                        .await??
+                        .collect(),
+                )
             }
         }
     }
