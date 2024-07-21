@@ -1,19 +1,9 @@
-use std::{
-    io::{self, Cursor},
-    pin::Pin,
-};
+use std::io;
 
-use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt, BufReader};
-use tokio::{
-    io::{AsyncRead, AsyncWrite},
-    net::UdpSocket,
-};
+use tokio::io::{AsyncRead, AsyncWrite};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-use crate::{
-    auth::Authenticator,
-    method_handlers::{Bind, Connect},
-    Socks5Error,
-};
+use crate::auth::Authenticator;
 
 use crate::protocol::{AuthMethod, Command, Reply, SocksSocketAddr, RESERVED, VERSION};
 
@@ -24,13 +14,16 @@ pub struct Sock5Socket<T, A, Connect, Bind> {
     bind_handler: Bind,
 }
 
+pub mod associate;
+pub mod bind;
+pub mod connect;
+pub mod socks5_io;
+
 impl<T, Auth, C, B> Sock5Socket<T, Auth, C, B>
 where
     Self: Unpin + Send,
     T: AsyncRead + AsyncWrite + Unpin + Send,
     Auth: Authenticator<T>,
-    C: Connect<Auth::Credentials>,
-    B: Bind<Auth::Credentials>,
 {
     pub fn new(inner: T, authenticator: Auth, connect_handler: C, bind_handler: B) -> Self {
         Self {
@@ -41,114 +34,6 @@ where
         }
     }
 
-    pub async fn bind(
-        &mut self,
-        addr: SocksSocketAddr,
-        credentials: Auth::Credentials,
-    ) -> crate::Result<()> {
-        let bind_inner = || async {
-            let server = self.bind_handler.bind(addr, &credentials).await?;
-
-            let localaddr = server
-                .local_addr()
-                .map_err(|err| crate::Socks5Error::Socks5Error(err.kind().into()))?;
-
-            self.reply(Reply::Success, localaddr.into()).await?;
-
-            let (client, client_addr) = self.bind_handler.accept(server, &credentials).await?;
-
-            self.reply(Reply::Success, client_addr.into()).await?;
-
-            self.bind_handler
-                .start_listening(&mut self.inner, client, credentials)
-                .await?;
-            Ok(())
-        };
-
-        let res: crate::Result<_> = bind_inner().await;
-        if let Err(Socks5Error::Socks5Error(err)) = res {
-            self.reply(err, Default::default()).await?;
-        }
-        Ok(())
-    }
-
-    pub async fn connect(
-        &mut self,
-        addr: SocksSocketAddr,
-        credntials: Auth::Credentials,
-    ) -> crate::Result<()> {
-        let connect_inner = || async {
-            let conn = self
-                .connect_handler
-                .establish_connection(addr.clone(), credntials)
-                .await?;
-
-            self.reply(Reply::Success, addr).await?;
-
-            self.connect_handler
-                .start_listening(&mut self.inner, conn)
-                .await?;
-
-            Ok(())
-        };
-
-        let res: crate::Result<_> = connect_inner().await;
-        if let Err(Socks5Error::Socks5Error(err)) = res {
-            self.reply(err, Default::default()).await?;
-        }
-        Ok(())
-    }
-
-    pub async fn associate(
-        &mut self,
-        addr: SocksSocketAddr,
-        credntials: Auth::Credentials,
-    ) -> crate::Result<()> {
-        let associate_inner = || async {
-            let listen_addr = addr;
-
-            let udp_listener = UdpSocket::bind("0.0.0.0:0").await?;
-            let peer_host = udp_listener.local_addr()?;
-            self.reply(Reply::Success, peer_host.into()).await?;
-
-            let mut buf = [0; 4096];
-            let (n, source) = udp_listener.recv_from(&mut buf).await?;
-
-            let mut cursor = BufReader::new(Cursor::new(&buf[..n]));
-            let reserved = cursor.read_u16().await?;
-            let fragment = cursor.read_u8().await?;
-            let addr = SocksSocketAddr::read(&mut cursor).await?;
-
-            println!("{:?}, {:?}, {:?}", reserved, fragment, addr);
-
-            let current_pos = cursor.stream_position().await? as usize;
-            let data = &buf[current_pos..n];
-            println!("{}", String::from_utf8(data.to_owned()).unwrap());
-
-            udp_listener
-                .send_to(data, &*addr.to_socket_addr().await?)
-                .await?;
-
-            let (n, res_addr) = udp_listener.recv_from(&mut buf).await?;
-
-            let mut res: Vec<u8> = Vec::with_capacity(n + 32);
-
-            res.extend_from_slice(&[0, 0]);
-            res.push(0);
-            res.extend(SocksSocketAddr::from(peer_host).to_bytes());
-            res.extend_from_slice(&buf[..n]);
-
-            udp_listener.send_to(&res[..], source).await?;
-
-            Ok(())
-        };
-
-        let res: crate::Result<_> = associate_inner().await;
-        if let Err(Socks5Error::Socks5Error(err)) = res {
-            self.reply(err, Default::default()).await?;
-        }
-        Ok(())
-    }
     pub async fn socks_request(
         &mut self,
     ) -> io::Result<(Command, SocksSocketAddr, Auth::Credentials)> {
@@ -231,47 +116,5 @@ where
 
     async fn parse_addr(&mut self) -> io::Result<SocksSocketAddr> {
         SocksSocketAddr::read(self).await
-    }
-}
-
-impl<T, Auth, Connect, Bind> AsyncRead for Sock5Socket<T, Auth, Connect, Bind>
-where
-    Self: Unpin,
-    T: AsyncRead + Unpin,
-{
-    fn poll_read(
-        mut self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-        buf: &mut tokio::io::ReadBuf<'_>,
-    ) -> std::task::Poll<std::io::Result<()>> {
-        Pin::new(&mut self.inner).poll_read(cx, buf)
-    }
-}
-
-impl<T, Auth, Connect, Bind> AsyncWrite for Sock5Socket<T, Auth, Connect, Bind>
-where
-    Self: Unpin,
-    T: AsyncWrite + Unpin,
-{
-    fn poll_write(
-        mut self: Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-        buf: &[u8],
-    ) -> std::task::Poll<Result<usize, std::io::Error>> {
-        Pin::new(&mut self.inner).poll_write(cx, buf)
-    }
-
-    fn poll_flush(
-        mut self: Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Result<(), std::io::Error>> {
-        Pin::new(&mut self.inner).poll_flush(cx)
-    }
-
-    fn poll_shutdown(
-        mut self: Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Result<(), std::io::Error>> {
-        Pin::new(&mut self.inner).poll_shutdown(cx)
     }
 }

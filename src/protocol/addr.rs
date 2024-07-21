@@ -4,10 +4,7 @@ use std::{
     ops::Deref,
 };
 
-use tokio::{
-    io::{AsyncRead, AsyncReadExt},
-    task::JoinError,
-};
+use tokio::io::{AsyncRead, AsyncReadExt};
 
 #[derive(Debug, Clone, Copy)]
 pub enum AddressType {
@@ -54,7 +51,8 @@ impl SocksSocketAddr {
 
                 Ok(
                     tokio::task::spawn_blocking(move || domain.to_socket_addrs())
-                        .await??
+                        .await
+                        .expect("Task isn't aborted")?
                         .collect(),
                 )
             }
