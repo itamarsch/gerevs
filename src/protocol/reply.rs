@@ -34,18 +34,18 @@ impl fmt::Display for Reply {
 impl std::error::Error for Reply {}
 
 impl Reply {
-    pub fn from_u8(value: u8) -> Self {
+    pub fn from_u8(value: u8) -> Option<Self> {
         match value {
-            0x00 => Reply::Success,
-            0x01 => Reply::GeneralFailure,
-            0x02 => Reply::ConnectionNotAllowedByRuleset,
-            0x03 => Reply::NetworkUnreachable,
-            0x04 => Reply::HostUnreachable,
-            0x05 => Reply::ConnectionRefused,
-            0x06 => Reply::TTLExpired,
-            0x07 => Reply::CommandNotSupported,
-            0x08 => Reply::AddressTypeNotSupported,
-            _ => panic!("Invalid value for Reply"),
+            0x00 => Some(Reply::Success),
+            0x01 => Some(Reply::GeneralFailure),
+            0x02 => Some(Reply::ConnectionNotAllowedByRuleset),
+            0x03 => Some(Reply::NetworkUnreachable),
+            0x04 => Some(Reply::HostUnreachable),
+            0x05 => Some(Reply::ConnectionRefused),
+            0x06 => Some(Reply::TTLExpired),
+            0x07 => Some(Reply::CommandNotSupported),
+            0x08 => Some(Reply::AddressTypeNotSupported),
+            _ => None,
         }
     }
 

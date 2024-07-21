@@ -88,25 +88,36 @@ where
         let version = conn.read_u8().await?;
 
         if version != USER_PASSWORD_VERSION {
-            return Err(ErrorKind::InvalidData.into());
+            return Err(io::Error::new(
+                ErrorKind::InvalidData,
+                "Invalid UsernamePassword version",
+            ));
         }
         let username_len = conn.read_u8().await?;
         if username_len < 1 {
-            return Err(ErrorKind::InvalidData.into());
+            return Err(io::Error::new(
+                ErrorKind::InvalidData,
+                "Username cannot be empty",
+            ));
         }
 
         let mut buf = vec![0; username_len as usize];
         conn.read_exact(&mut buf).await?;
-        let username = String::from_utf8(buf).map_err(|_| ErrorKind::InvalidData)?;
+        let username = String::from_utf8(buf)
+            .map_err(|_| io::Error::new(ErrorKind::InvalidData, "Username was invalid utf8"))?;
 
         let password_len = conn.read_u8().await?;
         if password_len < 1 {
-            return Err(ErrorKind::InvalidData.into());
+            return Err(io::Error::new(
+                ErrorKind::InvalidData,
+                "Password cannot be empty",
+            ));
         }
 
         let mut buf = vec![0; password_len as usize];
         conn.read_exact(&mut buf).await?;
-        let password = String::from_utf8(buf).map_err(|_| ErrorKind::InvalidData)?;
+        let password = String::from_utf8(buf)
+            .map_err(|_| io::Error::new(ErrorKind::InvalidData, "Password was invalid utf8"))?;
 
         let user: User = User { username, password };
         Ok(user)

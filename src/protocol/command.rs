@@ -7,12 +7,12 @@ pub enum Command {
 }
 
 impl Command {
-    pub fn from_u8(value: u8) -> Self {
+    pub fn from_u8(value: u8) -> Option<Self> {
         match value {
-            0x01 => Command::Connect,
-            0x02 => Command::Bind,
-            0x03 => Command::UdpAssociate,
-            _ => panic!("Invalid value for Command"),
+            0x01 => Some(Command::Connect),
+            0x02 => Some(Command::Bind),
+            0x03 => Some(Command::UdpAssociate),
+            _ => None,
         }
     }
 

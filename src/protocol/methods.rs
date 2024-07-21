@@ -29,7 +29,7 @@ impl AuthMethod {
             USERNAME_PASSWORD => AuthMethod::UsernamePassword,
             (IANA_ASSIGNED_LOWER..=IANA_ASSIGNED_UPPER) => AuthMethod::IanaAssigned(value),
             PRIVATE_METHOD_LOWER..=PRIVATE_METHOD_UPPER => AuthMethod::PrivateMethods(value),
-            _ => panic!("Invalid value for AuthMethod"),
+            _ => unreachable!("u8 range handled fully"),
         }
     }
     pub fn to_u8(&self) -> u8 {

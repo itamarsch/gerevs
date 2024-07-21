@@ -1,5 +1,5 @@
 use std::{
-    io,
+    io::{self, ErrorKind},
     net::{Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6, ToSocketAddrs},
     ops::Deref,
 };
@@ -14,12 +14,12 @@ pub enum AddressType {
 }
 
 impl AddressType {
-    pub fn from_u8(value: u8) -> Self {
+    pub fn from_u8(value: u8) -> Option<Self> {
         match value {
-            0x01 => AddressType::Ipv4,
-            0x03 => AddressType::DomainName,
-            0x04 => AddressType::Ipv6,
-            _ => panic!("Invalid value for AddressType"),
+            0x01 => Some(AddressType::Ipv4),
+            0x03 => Some(AddressType::DomainName),
+            0x04 => Some(AddressType::Ipv6),
+            _ => None,
         }
     }
 
@@ -63,7 +63,13 @@ impl SocksSocketAddr {
         T: AsyncRead + Unpin,
     {
         let address_type = stream.read_u8().await?;
-        let address_type = AddressType::from_u8(address_type);
+        let Some(address_type) = AddressType::from_u8(address_type) else {
+            return Err(io::Error::new(
+                ErrorKind::InvalidData,
+                "Invalid address type",
+            ));
+        };
+
         let addr = match address_type {
             AddressType::Ipv4 => {
                 let mut addr = [0; 4];
@@ -74,7 +80,9 @@ impl SocksSocketAddr {
                 let len = stream.read_u8().await?;
                 let mut domain = vec![0; len as usize];
                 stream.read_exact(&mut domain[..]).await?;
-                let domain = String::from_utf8(domain).map_err(|_| io::ErrorKind::InvalidData)?;
+                let domain = String::from_utf8(domain).map_err(|_| {
+                    io::Error::new(io::ErrorKind::InvalidData, "Domain name was invalid utf8")
+                })?;
                 Addr::Domain(domain)
             }
             AddressType::Ipv6 => {
