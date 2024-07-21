@@ -1,11 +1,8 @@
-use std::{
-    io,
-    net::{SocketAddrV4, SocketAddrV6},
-};
+use std::io;
 
 use tokio::net::TcpStream;
 
-use crate::protocol::{Addr, SocksSocketAddr};
+use crate::protocol::SocksSocketAddr;
 
 use super::Connect;
 
@@ -19,7 +16,7 @@ impl Connect<()> for TunnelConnect {
         addr: SocksSocketAddr,
         _credentials: (),
     ) -> crate::Result<TcpStream> {
-        let res = TcpStream::connect(addr.to_socket_addr()?).await?;
+        let res = TcpStream::connect(addr.to_socket_addr().await?).await?;
         Ok(res)
     }
 

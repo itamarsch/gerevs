@@ -1,14 +1,11 @@
-use std::net::{SocketAddr, SocketAddrV4};
+use std::net::SocketAddr;
 
 use tokio::{
     io::{AsyncRead, AsyncWrite},
     net::{TcpListener, TcpStream},
 };
 
-use crate::{
-    protocol::{Addr, SocksSocketAddr},
-    Socks5Error,
-};
+use crate::{protocol::SocksSocketAddr, Socks5Error};
 
 pub mod bind_denier;
 pub mod tunnel_bind;
@@ -20,7 +17,7 @@ pub trait Bind<C> {
         _: &C,
     ) -> impl std::future::Future<Output = crate::Result<TcpListener>> {
         async move {
-            TcpListener::bind(addr.to_socket_addr()?)
+            TcpListener::bind(addr.to_socket_addr().await?)
                 .await
                 .map_err(|err| crate::Socks5Error::Socks5Error(err.kind().into()))
         }

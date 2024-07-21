@@ -3,7 +3,10 @@ use std::{
     net::{Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6, ToSocketAddrs},
 };
 
-use tokio::io::{AsyncRead, AsyncReadExt};
+use tokio::{
+    io::{AsyncRead, AsyncReadExt},
+    task::JoinError,
+};
 
 #[derive(Debug, Clone, Copy)]
 pub enum AddressType {
@@ -41,16 +44,20 @@ impl Default for SocksSocketAddr {
 }
 
 impl SocksSocketAddr {
-    pub fn to_socket_addr(&self) -> io::Result<SocketAddr> {
+    pub async fn to_socket_addr(&self) -> io::Result<SocketAddr> {
         match self.addr {
             Addr::Ipv4(addrv4) => Ok(SocketAddrV4::new(addrv4, self.port).into()),
             Addr::Ipv6(addrv6) => Ok(SocketAddrV6::new(addrv6, self.port, 0, 0).into()),
             Addr::Domain(ref domain) => {
                 let domain = format!("{}:{}", domain, self.port);
-                domain.to_socket_addrs()?.next().ok_or(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    "Unable to resolve domain",
-                ))
+
+                tokio::task::spawn_blocking(move || {
+                    domain.to_socket_addrs()?.next().ok_or(std::io::Error::new(
+                        std::io::ErrorKind::Other,
+                        "Unable to resolve domain",
+                    ))
+                })
+                .await?
             }
         }
     }

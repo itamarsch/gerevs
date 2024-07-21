@@ -1,6 +1,5 @@
 use std::{
     io::{self, Cursor},
-    net::{Ipv4Addr, Ipv6Addr, SocketAddrV4},
     pin::Pin,
 };
 
@@ -16,9 +15,7 @@ use crate::{
     Socks5Error,
 };
 
-use crate::protocol::{
-    Addr, AddressType, AuthMethod, Command, Reply, SocksSocketAddr, RESERVED, VERSION,
-};
+use crate::protocol::{AuthMethod, Command, Reply, SocksSocketAddr, RESERVED, VERSION};
 
 pub struct Sock5Socket<T, A, Connect, Bind> {
     inner: T,
@@ -128,11 +125,13 @@ where
             let data = &buf[current_pos..n];
             println!("{}", String::from_utf8(data.to_owned()).unwrap());
 
-            udp_listener.send_to(data, addr.to_socket_addr()?).await?;
+            udp_listener
+                .send_to(data, addr.to_socket_addr().await?)
+                .await?;
 
             let (n, res_addr) = udp_listener.recv_from(&mut buf).await?;
 
-            let mut res: Vec<u8> = Vec::with_capacity(n + 10);
+            let mut res: Vec<u8> = Vec::with_capacity(n + 32);
 
             res.extend_from_slice(&[0, 0]);
             res.push(0);
