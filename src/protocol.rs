@@ -12,3 +12,4 @@ pub use reply::Reply;
 
 pub const VERSION: u8 = 0x05;
 pub const RESERVED: u8 = 0x00;
+pub const RESERVED_16: u16 = 0x00;
