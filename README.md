@@ -14,7 +14,7 @@ Gerevs is a work-in-progress Rust crate designed to simplify the creation of sec
 ## SOCKS5 Commands
 - [x] CONNECT
 - [x] BIND
-- [x] UDP ASSOCIATE (The proxy still doesn't support fragmentation, but I doubt it will because after scouring the internet I couldn't find implementations that actually bothered to implement fragmentation)
+- [x] UDP ASSOCIATE (The proxy still doesn't support fragmentation, but I doubt it will because after scouring the internet I couldn't find client side implementations that actually bothered to implement fragmentation)
 
 ## SOCKS5 Authentication
 - [x] Username password ([RFC 1929](https://datatracker.ietf.org/doc/html/rfc1929))
@@ -23,7 +23,7 @@ Gerevs is a work-in-progress Rust crate designed to simplify the creation of sec
 
 Note: Gerevs is designed for server-side implementation only.
 
-## What's in a Name?
+## What's in the Name?
 
 The name **Gerevs** is derived from the Hebrew word "גרב" (gerev), which means "sock".
 
