@@ -1,6 +1,9 @@
 use gerevs::{
     auth::no_auth_authenticator::NoAuthAuthenticator,
-    method_handlers::{udp_socket::AssociateTunnel, BindDenier, TunnelConnect},
+    method_handlers::{
+        associate_denier::AssociateDenier, tunnel_associate::TunnelAssociate, BindDenier,
+        TunnelConnect,
+    },
     socks5_socket::Sock5Socket,
 };
 use std::error::Error;
@@ -28,17 +31,7 @@ async fn handle_connection(client: TcpStream) -> gerevs::Result<()> {
         NoAuthAuthenticator,
         TunnelConnect,
         BindDenier,
-        AssociateTunnel,
+        AssociateDenier,
     );
-    let (command, addr, credentials) = sock5_stream.socks_request().await?;
-    println!("Connection, addr: {:?}, Command: {:?}", addr, command);
-    match command {
-        gerevs::protocol::Command::Connect => sock5_stream.connect(addr, credentials).await?,
-        gerevs::protocol::Command::Bind => sock5_stream.bind(addr, credentials).await?,
-        gerevs::protocol::Command::UdpAssociate => {
-            sock5_stream.associate(addr, credentials).await?
-        }
-    }
-
-    Ok(())
+    sock5_stream.run().await
 }

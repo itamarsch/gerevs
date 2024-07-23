@@ -5,6 +5,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 use crate::auth::Authenticator;
 
+use crate::method_handlers::{Associate, Bind, Connect};
 use crate::protocol::{AuthMethod, Command, Reply, SocksSocketAddr, RESERVED, VERSION};
 
 pub struct Sock5Socket<T, A, Connect, Bind, Associate> {
@@ -73,6 +74,27 @@ where
             }
         };
         Ok(credentials)
+    }
+}
+
+impl<T, Auth, C, B, A> Sock5Socket<T, Auth, C, B, A>
+where
+    Self: Unpin + Send,
+    T: AsyncWrite + AsyncRead + Send + Unpin,
+    Auth: Authenticator<T>,
+    Auth::Credentials: Sync + Send,
+    A: Associate<Auth::Credentials>,
+    B: Bind<Auth::Credentials>,
+    C: Connect<Auth::Credentials>,
+{
+    pub async fn run(&mut self) -> crate::Result<()> {
+        let (command, addr, credentials) = self.socks_request().await?;
+        match command {
+            Command::Connect => self.connect(addr, credentials).await?,
+            Command::Bind => self.bind(addr, credentials).await?,
+            Command::UdpAssociate => self.associate(addr, credentials).await?,
+        };
+        Ok(())
     }
 }
 

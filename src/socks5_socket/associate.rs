@@ -63,7 +63,7 @@ where
             .associate_handler
             .bind(credentials)
             .await
-            .map_err(|err| Socks5Error::Socks5Error(err.kind().into()))?;
+            .map_err(|err| Socks5Error::Socks5Error(err.into()))?;
 
         self.reply(Reply::Success, peer_host.into()).await?;
 
@@ -131,7 +131,7 @@ where
         conn: &mut A::Connection,
         buf: &[u8],
         credntials: &Auth::Credentials,
-    ) -> io::Result<usize> {
+    ) -> crate::Result<usize> {
         let udp_message = UdpMessage::parse(buf).await?;
         let dst = &*udp_message.dst.to_socket_addr().await?;
 
@@ -147,7 +147,7 @@ where
         source: SocketAddr,
         client_addrs: &[SocketAddr],
         credentials: &Auth::Credentials,
-    ) -> io::Result<usize> {
+    ) -> crate::Result<usize> {
         let response = UdpMessage {
             fragment_number: 0,
             dst: source.into(),
@@ -177,16 +177,9 @@ where
         };
 
         let res: crate::Result<()> = associate_inner().await;
-        match &res {
-            Err(Socks5Error::Socks5Error(err)) => {
-                println!("Error: {:?}", err);
-                self.reply(*err, Default::default()).await?;
-            }
-            Err(err) => {
-                println!("Error: {:?}", err);
-            }
-            _ => {}
+        if let Err(Socks5Error::Socks5Error(err)) = &res {
+            self.reply(*err, Default::default()).await?;
         }
-        Ok(())
+        res
     }
 }

@@ -45,9 +45,9 @@ where
         };
 
         let res: crate::Result<_> = bind_inner().await;
-        if let Err(Socks5Error::Socks5Error(err)) = res {
-            self.reply(err, Default::default()).await?;
+        if let Err(Socks5Error::Socks5Error(err)) = &res {
+            self.reply(*err, Default::default()).await?;
         }
-        Ok(())
+        res
     }
 }
