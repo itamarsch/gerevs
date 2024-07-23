@@ -9,7 +9,7 @@ use crate::{
 
 use super::Sock5Socket;
 
-impl<T, Auth, C, B> Sock5Socket<T, Auth, C, B>
+impl<T, Auth, C, B, A> Sock5Socket<T, Auth, C, B, A>
 where
     Self: Unpin + Send,
     T: AsyncRead + AsyncWrite + Unpin + Send,
@@ -22,7 +22,11 @@ where
         credentials: Auth::Credentials,
     ) -> crate::Result<()> {
         let bind_inner = || async {
-            let server = self.bind_handler.bind(addr, &credentials).await?;
+            let server = self
+                .bind_handler
+                .bind(addr, &credentials)
+                .await
+                .map_err(|err| Socks5Error::Socks5Error(err.into()))?;
 
             let localaddr = server
                 .local_addr()

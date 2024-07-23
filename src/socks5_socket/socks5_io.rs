@@ -4,7 +4,7 @@ use tokio::io::{AsyncRead, AsyncWrite};
 
 use super::Sock5Socket;
 
-impl<T, Auth, Connect, Bind> AsyncRead for Sock5Socket<T, Auth, Connect, Bind>
+impl<T, Auth, Connect, Bind, Associate> AsyncRead for Sock5Socket<T, Auth, Connect, Bind, Associate>
 where
     Self: Unpin,
     T: AsyncRead + Unpin,
@@ -18,7 +18,8 @@ where
     }
 }
 
-impl<T, Auth, Connect, Bind> AsyncWrite for Sock5Socket<T, Auth, Connect, Bind>
+impl<T, Auth, Connect, Bind, Associate> AsyncWrite
+    for Sock5Socket<T, Auth, Connect, Bind, Associate>
 where
     Self: Unpin,
     T: AsyncWrite + Unpin,

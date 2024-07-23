@@ -7,11 +7,12 @@ use crate::auth::Authenticator;
 
 use crate::protocol::{AuthMethod, Command, Reply, SocksSocketAddr, RESERVED, VERSION};
 
-pub struct Sock5Socket<T, A, Connect, Bind> {
+pub struct Sock5Socket<T, A, Connect, Bind, Associate> {
     inner: T,
     authenticator: A,
     connect_handler: Connect,
     bind_handler: Bind,
+    associate_handler: Associate,
 }
 
 pub mod associate;
@@ -19,18 +20,25 @@ pub mod bind;
 pub mod connect;
 pub mod socks5_io;
 
-impl<T, Auth, C, B> Sock5Socket<T, Auth, C, B>
+impl<T, Auth, C, B, A> Sock5Socket<T, Auth, C, B, A>
 where
     Self: Unpin + Send,
     T: AsyncRead + AsyncWrite + Unpin + Send,
     Auth: Authenticator<T>,
 {
-    pub fn new(inner: T, authenticator: Auth, connect_handler: C, bind_handler: B) -> Self {
+    pub fn new(
+        inner: T,
+        authenticator: Auth,
+        connect_handler: C,
+        bind_handler: B,
+        associate_handler: A,
+    ) -> Self {
         Self {
             inner,
             authenticator,
             connect_handler,
             bind_handler,
+            associate_handler,
         }
     }
 
@@ -68,7 +76,7 @@ where
     }
 }
 
-impl<T, Auth, C, B> Sock5Socket<T, Auth, C, B>
+impl<T, Auth, C, B, A> Sock5Socket<T, Auth, C, B, A>
 where
     Self: Unpin + Send,
     T: AsyncRead + AsyncWrite + Unpin + Send,

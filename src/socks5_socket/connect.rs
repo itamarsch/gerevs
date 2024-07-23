@@ -8,7 +8,7 @@ use crate::{
 };
 
 use super::Sock5Socket;
-impl<T, Auth, C, B> Sock5Socket<T, Auth, C, B>
+impl<T, Auth, C, B, A> Sock5Socket<T, Auth, C, B, A>
 where
     Self: Unpin + Send,
     T: AsyncRead + AsyncWrite + Unpin + Send,
@@ -24,7 +24,8 @@ where
             let conn = self
                 .connect_handler
                 .establish_connection(addr.clone(), credntials)
-                .await?;
+                .await
+                .map_err(|err| Socks5Error::Socks5Error(err.into()))?;
 
             self.reply(Reply::Success, addr).await?;
 

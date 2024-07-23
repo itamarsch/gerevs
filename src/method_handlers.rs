@@ -1,5 +1,8 @@
+mod associate;
 mod bind;
 mod connect;
+pub use associate::udp_socket;
+pub use associate::Associate;
 pub use bind::bind_denier::BindDenier;
 pub use bind::tunnel_bind::TunnelBind;
 pub use bind::Bind;

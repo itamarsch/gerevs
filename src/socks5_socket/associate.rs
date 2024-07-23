@@ -1,62 +1,25 @@
 use std::{
-    io::{self, Cursor},
+    io::{self},
     net::{Ipv4Addr, Ipv6Addr, SocketAddr},
 };
 
 use tokio::{
-    io::{AsyncRead, AsyncReadExt, AsyncSeekExt, AsyncWrite},
-    net::UdpSocket,
+    io::{AsyncRead, AsyncReadExt, AsyncWrite},
     select,
 };
 
-#[derive(Debug)]
-struct UdpMessage<'a> {
-    fragment_number: u8,
-    dst: SocksSocketAddr,
-    data: &'a [u8],
-}
-impl<'a> UdpMessage<'a> {
-    fn as_bytes(&self) -> Vec<u8> {
-        let mut res: Vec<u8> = Vec::with_capacity(self.data.len() + 32);
-        res.extend_from_slice(&RESERVED_16.to_be_bytes());
-        res.push(self.fragment_number);
-        res.extend(self.dst.to_bytes());
-        res.extend_from_slice(self.data);
-        res
-    }
-
-    async fn parse(buf: &'a [u8]) -> io::Result<Self> {
-        let mut cursor = Cursor::new(buf);
-
-        let reserved = cursor.read_u16().await?;
-        if reserved != RESERVED_16 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "Reserved bytes need to be zero but weren't",
-            ));
-        }
-
-        let fragment_number = cursor.read_u8().await?;
-        let dst = SocksSocketAddr::read(&mut cursor).await?;
-
-        let current_pos = cursor.stream_position().await? as usize;
-        let data = &buf[current_pos..];
-        Ok(UdpMessage {
-            fragment_number,
-            dst,
-            data,
-        })
-    }
-}
-
 use crate::{
     auth::Authenticator,
-    protocol::{Reply, SocksSocketAddr, RESERVED_16},
+    method_handlers::Associate,
+    protocol::{Reply, SocksSocketAddr},
     Socks5Error,
 };
 
+use self::udp_message::UdpMessage;
+
 use super::Sock5Socket;
 
+mod udp_message;
 async fn addrs_match(client_addrs: &[SocketAddr], udp_addr: &SocketAddr) -> bool {
     for sa in client_addrs.iter() {
         if sa.port() == 0 {
@@ -84,36 +47,40 @@ async fn addrs_match(client_addrs: &[SocketAddr], udp_addr: &SocketAddr) -> bool
     false
 }
 
-impl<T, Auth, C, B> Sock5Socket<T, Auth, C, B>
+impl<T, Auth, C, B, A> Sock5Socket<T, Auth, C, B, A>
 where
     Self: Unpin + Send,
     T: AsyncRead + AsyncWrite + Unpin + Send,
     Auth: Authenticator<T>,
+    A: Associate<Auth::Credentials>,
 {
-    async fn udp_associate_handshake(&mut self) -> crate::Result<UdpSocket> {
-        let udp_listener = UdpSocket::bind("0.0.0.0:0")
+    async fn udp_associate_handshake(
+        &mut self,
+        credentials: &Auth::Credentials,
+    ) -> crate::Result<A::Connection> {
+        let (peer_host, conn) = self
+            .associate_handler
+            .bind(credentials)
             .await
-            .map_err(Socks5Error::from)?;
-
-        let peer_host = udp_listener.local_addr().map_err(Socks5Error::from)?;
+            .map_err(|err| Socks5Error::Socks5Error(err.kind().into()))?;
 
         self.reply(Reply::Success, peer_host.into()).await?;
 
-        Ok(udp_listener)
+        Ok(conn)
     }
 
     async fn udp_listen(
         &mut self,
-        udp_socket: UdpSocket,
+        mut conn: A::Connection,
         client_addrs: &[SocketAddr],
+        credntials: &Auth::Credentials,
     ) -> crate::Result<()> {
         let mut verified_client_addr = None;
         let mut buf = [0; 4096];
         let mut tcp_buf = [0; 1];
         loop {
             let (n, source) = select! {
-                result = udp_socket.recv_from(&mut buf) => {
-
+                result = self.associate_handler.recv_from(&mut conn,&mut buf, credntials) => {
                     let Ok((n, source)) = result else {
                         continue;
                     };
@@ -121,7 +88,7 @@ where
                     (n,source)
                 }
 
-                tcp_read = self.read(&mut tcp_buf) => {
+                tcp_read = self.inner.read(&mut tcp_buf) => {
                     break match tcp_read {
                         Ok(0) => Ok(()),
                         Err(err) => Err(err.into()),
@@ -146,9 +113,11 @@ where
             };
 
             let res = if addr == source {
-                Self::forward_to_server(&udp_socket, &buf[..n]).await
+                self.forward_to_server(&mut conn, &buf[..n], &credntials)
+                    .await
             } else {
-                Self::forward_to_client(&udp_socket, &buf[..n], source, client_addrs).await
+                self.forward_to_client(&mut conn, &buf[..n], source, client_addrs, &credntials)
+                    .await
             };
             if res.is_err() {
                 continue;
@@ -156,35 +125,45 @@ where
         }
     }
 
-    async fn forward_to_server(udp_socket: &UdpSocket, buf: &[u8]) -> io::Result<usize> {
+    async fn forward_to_server(
+        &mut self,
+        conn: &mut A::Connection,
+        buf: &[u8],
+        credntials: &Auth::Credentials,
+    ) -> io::Result<usize> {
         let udp_message = UdpMessage::parse(buf).await?;
         let dst = &*udp_message.dst.to_socket_addr().await?;
 
-        udp_socket.send_to(udp_message.data, dst).await
+        self.associate_handler
+            .send_to(conn, udp_message.data, dst, credntials)
+            .await
     }
 
     async fn forward_to_client(
-        udp_socket: &UdpSocket,
+        &mut self,
+        conn: &mut A::Connection,
         buf: &[u8],
         source: SocketAddr,
         client_addrs: &[SocketAddr],
+        credentials: &Auth::Credentials,
     ) -> io::Result<usize> {
         let response = UdpMessage {
             fragment_number: 0,
             dst: source.into(),
             data: buf,
         };
-        udp_socket
-            .send_to(&response.as_bytes()[..], client_addrs)
+        self.associate_handler
+            .send_to(conn, &response.as_bytes()[..], client_addrs, credentials)
             .await
     }
 
     pub async fn associate(
         &mut self,
         addr: SocksSocketAddr,
-        credntials: Auth::Credentials,
+        credentials: Auth::Credentials,
     ) -> crate::Result<()> {
         let associate_inner = || async {
+            let credentials = credentials;
             let client_addrs = addr;
 
             let client_addrs = &*client_addrs
@@ -192,13 +171,20 @@ where
                 .await
                 .map_err(Socks5Error::from)?;
 
-            let udp_socket = self.udp_associate_handshake().await?;
-            self.udp_listen(udp_socket, client_addrs).await
+            let conn = self.udp_associate_handshake(&credentials).await?;
+            self.udp_listen(conn, client_addrs, &credentials).await
         };
 
         let res: crate::Result<()> = associate_inner().await;
-        if let Err(Socks5Error::Socks5Error(err)) = res {
-            self.reply(err, Default::default()).await?;
+        match &res {
+            Err(Socks5Error::Socks5Error(err)) => {
+                println!("Error: {:?}", err);
+                self.reply(*err, Default::default()).await?;
+            }
+            Err(err) => {
+                println!("Error: {:?}", err);
+            }
+            _ => {}
         }
         Ok(())
     }

@@ -17,3 +17,12 @@ pub enum Socks5Error {
     #[error("Error in network operation")]
     IoError(#[from] io::Error),
 }
+
+impl From<Socks5Error> for Reply {
+    fn from(value: Socks5Error) -> Self {
+        match value {
+            Socks5Error::Socks5Error(r) => r,
+            Socks5Error::IoError(io) => io.kind().into(),
+        }
+    }
+}
