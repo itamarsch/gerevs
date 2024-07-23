@@ -1,4 +1,5 @@
 use tokio::io::{AsyncRead, AsyncWrite};
+use tracing::{info, instrument, trace};
 
 use crate::{
     auth::Authenticator,
@@ -15,6 +16,7 @@ where
     Auth: Authenticator<T>,
     C: Connect<Auth::Credentials>,
 {
+    #[instrument(skip_all)]
     pub async fn connect(
         &mut self,
         addr: SocksSocketAddr,
@@ -27,11 +29,14 @@ where
                 .await
                 .map_err(|err| Socks5Error::Socks5Error(err.into()))?;
 
-            self.reply(Reply::Success, addr).await?;
+            trace!("Connection established with: {}", addr);
+            self.reply(Reply::Success, addr.clone()).await?;
 
             self.connect_handler
                 .start_listening(&mut self.inner, conn)
                 .await?;
+
+            info!("Connection with {} closed succefully", addr);
 
             Ok(())
         };

@@ -1,4 +1,5 @@
 use std::{
+    fmt::{self, Display},
     io::{self, ErrorKind},
     net::{Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6, ToSocketAddrs},
     ops::Deref,
@@ -32,6 +33,13 @@ pub struct SocksSocketAddr {
     pub port: u16,
     pub addr: Addr,
 }
+
+impl Display for SocksSocketAddr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}:{}", self.addr, self.port)
+    }
+}
+
 impl Default for SocksSocketAddr {
     fn default() -> Self {
         Self {
@@ -136,12 +144,23 @@ pub enum Addr {
     Ipv6(Ipv6Addr),
     Domain(String),
 }
+
 impl Addr {
     pub fn addr_type(&self) -> AddressType {
         match self {
             Addr::Ipv4(_) => AddressType::Ipv4,
             Addr::Ipv6(_) => AddressType::Ipv6,
             Addr::Domain(_) => AddressType::DomainName,
+        }
+    }
+}
+
+impl Display for Addr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Addr::Ipv4(addr) => write!(f, "{}", addr),
+            Addr::Ipv6(addr) => write!(f, "{}", addr),
+            Addr::Domain(domain) => write!(f, "{}", domain),
         }
     }
 }

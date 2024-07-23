@@ -7,6 +7,7 @@ use tokio::{
     io::{AsyncRead, AsyncReadExt, AsyncWrite},
     select,
 };
+use tracing::{error, info, instrument, trace, warn};
 
 use crate::{
     auth::Authenticator,
@@ -59,13 +60,15 @@ where
         &mut self,
         credentials: &Auth::Credentials,
     ) -> crate::Result<A::Connection> {
-        let (peer_host, conn) = self
+        let (localaddr, conn) = self
             .associate_handler
             .bind(credentials)
             .await
             .map_err(|err| Socks5Error::Socks5Error(err.into()))?;
 
-        self.reply(Reply::Success, peer_host.into()).await?;
+        trace!("Listening on udp: {}", localaddr);
+
+        self.reply(Reply::Success, localaddr.into()).await?;
 
         Ok(conn)
     }
@@ -89,11 +92,18 @@ where
                     (n,source)
                 }
 
+
                 tcp_read = self.inner.read(&mut tcp_buf) => {
                     break match tcp_read {
-                        Ok(0) => Ok(()),
-                        Err(err) => Err(err.into()),
+                        Ok(0) => {
+                            info!("Tcp connection closed closing connection");
+                            Ok(())
+                        },
+                        Err(err) => {
+                            Err(err.into())
+                        },
                         Ok(_) => {
+                            error!("Received bytes from tcp stream, client implementation is invalid, closing");
                             Err(io::Error::new(
                                 io::ErrorKind::InvalidData,
                                 "Received unexpected data from tcpstream",
@@ -103,22 +113,33 @@ where
                     };
                 }
             };
+            trace!("Received {} bytes from: {}", n, source);
 
             if verified_client_addr.is_none() && addrs_match(client_addrs, &source).await {
                 verified_client_addr = Some(source);
+                trace!("{} is the client", source);
             }
 
             // No client, ignore message
-            let Some(addr) = verified_client_addr else {
+            let Some(verified_client_addr) = verified_client_addr else {
+                warn!(
+                    "Ignored packet that wasn't the client because we still don't know who he is"
+                );
                 continue;
             };
 
-            let res = if addr == source {
+            let res = if verified_client_addr == source {
                 self.forward_to_server(&mut conn, &buf[..n], credntials)
                     .await
             } else {
-                self.forward_to_client(&mut conn, &buf[..n], source, client_addrs, credntials)
-                    .await
+                self.forward_to_client(
+                    &mut conn,
+                    &buf[..n],
+                    source,
+                    verified_client_addr,
+                    credntials,
+                )
+                .await
             };
             if res.is_err() {
                 continue;
@@ -134,6 +155,7 @@ where
     ) -> crate::Result<usize> {
         let udp_message = UdpMessage::parse(buf).await?;
         let dst = &*udp_message.dst.to_socket_addr().await?;
+        trace!("Sending {} bytes to: {:?}", udp_message.data.len(), dst);
 
         self.associate_handler
             .send_to(conn, udp_message.data, dst, credntials)
@@ -145,7 +167,7 @@ where
         conn: &mut A::Connection,
         buf: &[u8],
         source: SocketAddr,
-        client_addrs: &[SocketAddr],
+        client: SocketAddr,
         credentials: &Auth::Credentials,
     ) -> crate::Result<usize> {
         let response = UdpMessage {
@@ -153,11 +175,19 @@ where
             dst: source.into(),
             data: buf,
         };
+
+        let response = &response.as_bytes()[..];
+        trace!(
+            "Sending {} bytes back to client ({:?})",
+            response.len(),
+            client
+        );
         self.associate_handler
-            .send_to(conn, &response.as_bytes()[..], client_addrs, credentials)
+            .send_to(conn, response, client, credentials)
             .await
     }
 
+    #[instrument(skip_all)]
     pub async fn associate(
         &mut self,
         addr: SocksSocketAddr,

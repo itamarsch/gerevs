@@ -2,6 +2,7 @@ use std::io::{self, ErrorKind};
 
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tracing::{info, instrument, trace};
 
 use crate::auth::Authenticator;
 
@@ -43,6 +44,7 @@ where
         }
     }
 
+    #[instrument(skip(self))]
     pub async fn socks_request(
         &mut self,
     ) -> io::Result<(Command, SocksSocketAddr, Auth::Credentials)> {
@@ -50,14 +52,18 @@ where
 
         let command = self.parse_request().await?;
         let addr = self.parse_addr().await?;
+        info!("Command: {:?}, dst: {}", command, addr);
 
         Ok((command, addr, credentials))
     }
 
+    #[instrument(skip(self))]
     async fn authenticate(&mut self) -> io::Result<Auth::Credentials> {
         let methods = self.parse_methods().await?;
+        trace!("Received methods: {:?}", methods);
 
         let method = self.authenticator.select_method(&methods);
+        trace!("Selected method: {:?}", method);
         self.write_auth_method(method).await?;
 
         let credentials = match self.authenticator.authenticate(&mut self.inner).await {
@@ -73,6 +79,7 @@ where
                 return Err(err);
             }
         };
+        trace!("Authentication success");
         Ok(credentials)
     }
 }
