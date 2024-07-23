@@ -6,8 +6,10 @@ use std::{
 use tokio::{
     io::{AsyncRead, AsyncReadExt, AsyncSeekExt, AsyncWrite},
     net::UdpSocket,
+    select,
 };
 
+#[derive(Debug)]
 struct UdpMessage<'a> {
     fragment_number: u8,
     dst: SocksSocketAddr,
@@ -113,21 +115,44 @@ where
 
             let mut client_addr = None;
             let mut buf = [0; 4096];
+            let mut tcp_buf = [0; 10];
             loop {
-                let Ok((n, source)) = udp_listener.recv_from(&mut buf).await else {
-                    continue;
+                let (n, source) = select! {
+                    result = udp_listener.recv_from(&mut buf) => {
+
+                        let Ok((n, source)) = result else {
+                            continue;
+                        };
+
+                        (n,source)
+                    }
+
+                    tcp_read = self.read(&mut tcp_buf) => {
+                        if let Ok(0) = tcp_read {
+                            break  Ok(())
+                        } else if let Err(err) = tcp_read {
+                            break Err(err.into())
+                        }else {
+                            break Err(io::Error::new(io::ErrorKind::InvalidData, "Received unexpected data from tcpstream").into())
+                        }
+
+                    }
                 };
 
+                println!("{:02X?}", &buf[..n]);
                 if client_addr.is_none() && addrs_match(&client_socks_addr, &source).await {
                     client_addr = Some(source);
                 }
+
                 let Some(addr) = client_addr else {
                     continue;
                 };
+
                 if addr == source {
                     let Ok(udp_message) = UdpMessage::parse(&buf[..n]).await else {
                         continue;
                     };
+                    println!("{:?}", udp_message);
 
                     let Ok(dst) = udp_message.dst.to_socket_addr().await else {
                         continue;
