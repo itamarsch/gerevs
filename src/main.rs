@@ -1,9 +1,6 @@
 use gerevs::{
     auth::no_auth_authenticator::NoAuthAuthenticator,
-    method_handlers::{
-        associate_denier::AssociateDenier, tunnel_associate::TunnelAssociate, BindDenier,
-        TunnelConnect,
-    },
+    method_handlers::{associate_denier::AssociateDenier, BindDenier, TunnelConnect},
     socks5_socket::Sock5Socket,
 };
 use std::error::Error;
