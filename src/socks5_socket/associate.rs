@@ -57,30 +57,28 @@ use crate::{
 
 use super::Sock5Socket;
 
-async fn addrs_match(socks_addr: &SocksSocketAddr, udp_addr: &SocketAddr) -> bool {
-    if socks_addr.port == 0 || udp_addr.port() == 0 {
-        return false;
-    }
+async fn addrs_match(client_addrs: &[SocketAddr], udp_addr: &SocketAddr) -> bool {
+    for sa in client_addrs.iter() {
+        if sa.port() == 0 {
+            continue;
+        }
 
-    if let Ok(resolved_socks_addrs) = socks_addr.to_socket_addr().await {
-        for sa in resolved_socks_addrs.iter() {
-            match (sa, udp_addr) {
-                (SocketAddr::V4(sa_v4), SocketAddr::V4(udp_v4)) => {
-                    if (*sa_v4.ip() == Ipv4Addr::UNSPECIFIED || sa_v4.ip() == udp_v4.ip())
-                        && sa_v4.port() == udp_v4.port()
-                    {
-                        return true;
-                    }
+        match (sa, udp_addr) {
+            (SocketAddr::V4(sa_v4), SocketAddr::V4(udp_v4)) => {
+                if (*sa_v4.ip() == Ipv4Addr::UNSPECIFIED || sa_v4.ip() == udp_v4.ip())
+                    && sa_v4.port() == udp_v4.port()
+                {
+                    return true;
                 }
-                (SocketAddr::V6(sa_v6), SocketAddr::V6(udp_v6)) => {
-                    if (*sa_v6.ip() == Ipv6Addr::UNSPECIFIED || sa_v6.ip() == udp_v6.ip())
-                        && sa_v6.port() == udp_v6.port()
-                    {
-                        return true;
-                    }
-                }
-                _ => {}
             }
+            (SocketAddr::V6(sa_v6), SocketAddr::V6(udp_v6)) => {
+                if (*sa_v6.ip() == Ipv6Addr::UNSPECIFIED || sa_v6.ip() == udp_v6.ip())
+                    && sa_v6.port() == udp_v6.port()
+                {
+                    return true;
+                }
+            }
+            _ => {}
         }
     }
     false
@@ -92,84 +90,110 @@ where
     T: AsyncRead + AsyncWrite + Unpin + Send,
     Auth: Authenticator<T>,
 {
+    async fn udp_associate_handshake(&mut self) -> crate::Result<UdpSocket> {
+        let udp_listener = UdpSocket::bind("0.0.0.0:0")
+            .await
+            .map_err(Socks5Error::from)?;
+
+        let peer_host = udp_listener.local_addr().map_err(Socks5Error::from)?;
+
+        self.reply(Reply::Success, peer_host.into()).await?;
+
+        Ok(udp_listener)
+    }
+
+    async fn udp_listen(
+        &mut self,
+        udp_socket: UdpSocket,
+        client_addrs: &[SocketAddr],
+    ) -> crate::Result<()> {
+        let mut verified_client_addr = None;
+        let mut buf = [0; 4096];
+        let mut tcp_buf = [0; 1];
+        loop {
+            let (n, source) = select! {
+                result = udp_socket.recv_from(&mut buf) => {
+
+                    let Ok((n, source)) = result else {
+                        continue;
+                    };
+
+                    (n,source)
+                }
+
+                tcp_read = self.read(&mut tcp_buf) => {
+                    break match tcp_read {
+                        Ok(0) => Ok(()),
+                        Err(err) => Err(err.into()),
+                        Ok(_) => {
+                            Err(io::Error::new(
+                                io::ErrorKind::InvalidData,
+                                "Received unexpected data from tcpstream",
+                            )
+                            .into())
+                        }
+                    };
+                }
+            };
+
+            if verified_client_addr.is_none() && addrs_match(client_addrs, &source).await {
+                verified_client_addr = Some(source);
+            }
+
+            // No client, ignore message
+            let Some(addr) = verified_client_addr else {
+                continue;
+            };
+
+            let res = if addr == source {
+                Self::forward_to_server(&udp_socket, &buf[..n]).await
+            } else {
+                Self::forward_to_client(&udp_socket, &buf[..n], source, client_addrs).await
+            };
+            if res.is_err() {
+                continue;
+            }
+        }
+    }
+
+    async fn forward_to_server(udp_socket: &UdpSocket, buf: &[u8]) -> io::Result<usize> {
+        let udp_message = UdpMessage::parse(buf).await?;
+        let dst = &*udp_message.dst.to_socket_addr().await?;
+
+        udp_socket.send_to(udp_message.data, dst).await
+    }
+
+    async fn forward_to_client(
+        udp_socket: &UdpSocket,
+        buf: &[u8],
+        source: SocketAddr,
+        client_addrs: &[SocketAddr],
+    ) -> io::Result<usize> {
+        let response = UdpMessage {
+            fragment_number: 0,
+            dst: source.into(),
+            data: buf,
+        };
+        udp_socket
+            .send_to(&response.as_bytes()[..], client_addrs)
+            .await
+    }
+
     pub async fn associate(
         &mut self,
         addr: SocksSocketAddr,
         credntials: Auth::Credentials,
     ) -> crate::Result<()> {
         let associate_inner = || async {
-            let client_socks_addr = addr;
+            let client_addrs = addr;
 
-            let client_socks_addr_resolved = &*client_socks_addr
+            let client_addrs = &*client_addrs
                 .to_socket_addr()
                 .await
                 .map_err(Socks5Error::from)?;
 
-            let udp_listener = UdpSocket::bind("0.0.0.0:0")
-                .await
-                .map_err(Socks5Error::from)?;
-
-            let peer_host = udp_listener.local_addr().map_err(Socks5Error::from)?;
-
-            self.reply(Reply::Success, peer_host.into()).await?;
-
-            let mut client_addr = None;
-            let mut buf = [0; 4096];
-            let mut tcp_buf = [0; 10];
-            loop {
-                let (n, source) = select! {
-                    result = udp_listener.recv_from(&mut buf) => {
-
-                        let Ok((n, source)) = result else {
-                            continue;
-                        };
-
-                        (n,source)
-                    }
-
-                    tcp_read = self.read(&mut tcp_buf) => {
-                        if let Ok(0) = tcp_read {
-                            break  Ok(())
-                        } else if let Err(err) = tcp_read {
-                            break Err(err.into())
-                        }else {
-                            break Err(io::Error::new(io::ErrorKind::InvalidData, "Received unexpected data from tcpstream").into())
-                        }
-
-                    }
-                };
-
-                println!("{:02X?}", &buf[..n]);
-                if client_addr.is_none() && addrs_match(&client_socks_addr, &source).await {
-                    client_addr = Some(source);
-                }
-
-                let Some(addr) = client_addr else {
-                    continue;
-                };
-
-                if addr == source {
-                    let Ok(udp_message) = UdpMessage::parse(&buf[..n]).await else {
-                        continue;
-                    };
-                    println!("{:?}", udp_message);
-
-                    let Ok(dst) = udp_message.dst.to_socket_addr().await else {
-                        continue;
-                    };
-                    let dst = &*dst;
-                    _ = udp_listener.send_to(udp_message.data, dst).await;
-                } else {
-                    let response = UdpMessage {
-                        fragment_number: 0,
-                        dst: source.into(),
-                        data: &buf[..n],
-                    };
-                    _ = udp_listener
-                        .send_to(&response.as_bytes()[..], client_socks_addr_resolved)
-                        .await;
-                }
-            }
+            let udp_socket = self.udp_associate_handshake().await?;
+            self.udp_listen(udp_socket, client_addrs).await
         };
 
         let res: crate::Result<()> = associate_inner().await;
