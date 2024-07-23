@@ -52,6 +52,7 @@ where
     Self: Unpin + Send,
     T: AsyncRead + AsyncWrite + Unpin + Send,
     Auth: Authenticator<T>,
+    Auth::Credentials: Sync + Send,
     A: Associate<Auth::Credentials>,
 {
     async fn udp_associate_handshake(
@@ -113,10 +114,10 @@ where
             };
 
             let res = if addr == source {
-                self.forward_to_server(&mut conn, &buf[..n], &credntials)
+                self.forward_to_server(&mut conn, &buf[..n], credntials)
                     .await
             } else {
-                self.forward_to_client(&mut conn, &buf[..n], source, client_addrs, &credntials)
+                self.forward_to_client(&mut conn, &buf[..n], source, client_addrs, credntials)
                     .await
             };
             if res.is_err() {

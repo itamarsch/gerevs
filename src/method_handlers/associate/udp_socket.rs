@@ -6,7 +6,10 @@ use super::Associate;
 
 pub struct AssociateTunnel;
 
-impl<C> Associate<C> for AssociateTunnel {
+impl<C> Associate<C> for AssociateTunnel
+where
+    C: Sync + Send,
+{
     type Connection = UdpSocket;
     async fn bind(&self, _: &C) -> io::Result<(SocketAddr, Self::Connection)> {
         let socket = UdpSocket::bind("0.0.0.0:0").await?;

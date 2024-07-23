@@ -3,24 +3,30 @@ use tokio::net::ToSocketAddrs;
 
 pub mod udp_socket;
 
-pub trait Associate<C> {
+pub trait Associate<C>
+where
+    C: Sync + Send,
+{
     type Connection;
-    async fn bind(&self, credentials: &C) -> io::Result<(SocketAddr, Self::Connection)>;
+    fn bind(
+        &self,
+        credentials: &C,
+    ) -> impl std::future::Future<Output = io::Result<(SocketAddr, Self::Connection)>> + Send;
 
-    async fn send_to<A>(
+    fn send_to<A>(
         &mut self,
         conn: &mut Self::Connection,
         buf: &[u8],
         dst: A,
         credentials: &C,
-    ) -> io::Result<usize>
+    ) -> impl std::future::Future<Output = io::Result<usize>> + Send
     where
-        A: ToSocketAddrs;
+        A: ToSocketAddrs + Send;
 
-    async fn recv_from(
+    fn recv_from(
         &mut self,
         conn: &mut Self::Connection,
         buf: &mut [u8],
         credentials: &C,
-    ) -> io::Result<(usize, SocketAddr)>;
+    ) -> impl std::future::Future<Output = io::Result<(usize, SocketAddr)>> + Send;
 }
