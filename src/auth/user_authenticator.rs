@@ -24,7 +24,7 @@ enum AuthStatus {
     Failure = 0x01,
 }
 
-pub trait UserValidator {
+pub trait UserAuthorizer {
     type Credentials;
     fn validate_user(
         &mut self,
@@ -34,7 +34,7 @@ pub trait UserValidator {
 
 pub struct UserAuthenticator<U>
 where
-    U: UserValidator,
+    U: UserAuthorizer,
 {
     user_validator: U,
 }
@@ -42,7 +42,7 @@ where
 impl<T, U> Authenticator<T> for UserAuthenticator<U>
 where
     T: AsyncRead + AsyncWrite + Unpin + Send,
-    U: UserValidator + Send + Sync,
+    U: UserAuthorizer + Send + Sync,
     U::Credentials: Send,
 {
     type Credentials = U::Credentials;
@@ -76,7 +76,7 @@ where
 
 impl<U> UserAuthenticator<U>
 where
-    U: UserValidator,
+    U: UserAuthorizer,
 {
     pub fn new(user_validator: U) -> UserAuthenticator<U> {
         UserAuthenticator { user_validator }
