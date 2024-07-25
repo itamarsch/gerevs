@@ -22,7 +22,7 @@ pub enum AuthMethod {
 }
 
 impl AuthMethod {
-    pub fn from_u8(value: u8) -> Self {
+    pub(crate) fn from_u8(value: u8) -> Self {
         match value {
             NO_AUTH_REQUIRED => AuthMethod::NoAuthRequired,
             GSSAPI => AuthMethod::Gssapi,
@@ -32,7 +32,7 @@ impl AuthMethod {
             _ => unreachable!("u8 range handled fully"),
         }
     }
-    pub fn to_u8(&self) -> u8 {
+    pub(crate) fn to_u8(&self) -> u8 {
         match *self {
             AuthMethod::NoAuthRequired => NO_AUTH_REQUIRED,
             AuthMethod::Gssapi => GSSAPI,

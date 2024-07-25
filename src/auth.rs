@@ -2,7 +2,7 @@ use std::{future::Future, io};
 
 use tokio::io::{AsyncRead, AsyncWrite};
 
-use crate::protocol::AuthMethod;
+pub use crate::protocol::AuthMethod;
 
 mod no_auth_authenticator;
 mod user_authenticator;
