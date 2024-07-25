@@ -24,15 +24,12 @@ where
         credentials: Auth::Credentials,
     ) -> crate::Result<()> {
         let bind_inner = || async {
-            let server = self
+            let (localaddr, server) = self
                 .bind_handler
                 .bind(addr, &credentials)
                 .await
                 .map_err(|err| Socks5Error::Socks5Error(err.into()))?;
 
-            let localaddr = server
-                .local_addr()
-                .map_err(|err| crate::Socks5Error::Socks5Error(err.kind().into()))?;
             debug!("Listening on {}", localaddr);
 
             self.reply(Reply::Success, localaddr.into()).await?;
