@@ -4,6 +4,16 @@ use tokio::net::UdpSocket;
 
 use super::Associate;
 
+/// The `TunnelAssociate` struct is an implementation of the `Associate` trait that handles
+/// UDP associate requests by establishing a UDP relay. It binds to a local address and
+/// allows sending and receiving UDP packets through the relay.
+///
+/// This is a simple and basic implementation that binds to a random available port on the local
+/// machine and directly relays UDP packets between the client and the target server without
+/// any additional processing or filtering.
+///
+/// This struct can be used in scenarios where basic UDP traffic needs to be tunneled through
+/// a SOCKS5 proxy server without any special handling or configuration.pub struct TunnelAssociate;
 pub struct TunnelAssociate;
 
 impl<C> Associate<C> for TunnelAssociate

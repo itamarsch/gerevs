@@ -6,6 +6,15 @@ use crate::protocol::SocksSocketAddr;
 
 use super::Connect;
 
+/// The `TunnelConnect` struct is an implementation of the `Connect` trait that handles
+/// TCP CONNECT requests by establishing a TCP connection and relaying data between the client
+/// and the target server.
+///
+/// This is a simple and basic implementation that establishes a direct TCP connection to the target
+/// server and relays data between the client and the server without any additional processing or filtering.
+///
+/// This struct can be used in scenarios where basic TCP traffic needs to be tunneled through
+/// a SOCKS5 proxy server without any special handling or configuration.
 pub struct TunnelConnect;
 
 impl Connect<()> for TunnelConnect {

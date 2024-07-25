@@ -4,6 +4,8 @@ use crate::protocol::Reply;
 
 use super::Associate;
 
+/// The `AssociateDenier` struct is an implementation of the `Associate` trait that denies all
+/// UDP associate requests. It is used to reject any attempt to establish a UDP relay.
 pub struct AssociateDenier;
 
 impl<C> Associate<C> for AssociateDenier

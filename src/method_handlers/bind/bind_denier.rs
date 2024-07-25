@@ -2,7 +2,11 @@ use crate::{protocol::Reply, Socks5Error};
 
 use super::Bind;
 
+/// The `BindDenier` struct is an implementation of the `Bind` trait that denies all
+/// bind requests. It is used to reject any attempt to bind to a specific address and port
+/// for incoming TCP connections.
 pub struct BindDenier;
+
 impl<C> Bind<C> for BindDenier
 where
     C: Send + Sync,

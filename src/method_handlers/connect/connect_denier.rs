@@ -2,7 +2,10 @@ use crate::{protocol::Reply, Socks5Error};
 
 use super::Connect;
 
+/// The `ConnectDenier` struct is an implementation of the `Connect` trait that denies all
+/// connection requests. It is used to reject any attempt to establish a TCP connection.
 pub struct ConnectDenier;
+
 impl<C> Connect<C> for ConnectDenier
 where
     C: Send + Sync,
