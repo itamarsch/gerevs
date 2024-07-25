@@ -1,7 +1,8 @@
 //! # User Authentication Module
 //!
 //! This module provides structures and traits for implementing username and password authentication
-//! in the SOCKS5 protocol. It includes the `UsernamePasswordAuthenticator` struct for performing
+//! in the SOCKS5 protocol as specified in [RFC 1929](https://datatracker.ietf.org/doc/html/rfc1929).
+//! It includes the `UsernamePasswordAuthenticator` struct for performing
 //! the authentication and the `UserAuthenticator` trait for validating user credentials.
 //!
 //! ## Example
@@ -74,7 +75,7 @@ pub trait UserAuthenticator {
 }
 
 /// The `UsernamePasswordAuthenticator` struct handles the username and password authentication process
-/// in the SOCKS5 protocol.
+/// in the SOCKS5 protocol as specified in [RFC 1929](https://datatracker.ietf.org/doc/html/rfc1929).
 pub struct UsernamePasswordAuthenticator<U>
 where
     U: UserAuthenticator,
@@ -101,7 +102,7 @@ where
         }
     }
 
-    /// Performs the authentication process using the username and password method.
+    /// Performs the authentication process using the username and password method as specified in RFC 1929.
     async fn authenticate(
         &mut self,
         conn: &mut T,
