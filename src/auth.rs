@@ -5,7 +5,7 @@ use tokio::io::{AsyncRead, AsyncWrite};
 pub use crate::protocol::AuthMethod;
 
 mod no_auth_authenticator;
-pub mod user_authenticator;
+pub mod username_password_authenticator;
 
 pub use no_auth_authenticator::NoAuthAuthenticator;
 
