@@ -14,7 +14,7 @@ where
 {
     type Credentials = ();
 
-    async fn authenticate(&mut self, _: &mut T) -> io::Result<Option<()>> {
+    async fn authenticate(&mut self, _: &mut T, _: AuthMethod) -> io::Result<Option<()>> {
         Ok(Some(()))
     }
 

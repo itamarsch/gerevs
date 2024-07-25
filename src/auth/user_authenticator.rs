@@ -47,7 +47,11 @@ where
 {
     type Credentials = U::Credentials;
 
-    async fn authenticate(&mut self, conn: &mut T) -> io::Result<Option<Self::Credentials>> {
+    async fn authenticate(
+        &mut self,
+        conn: &mut T,
+        _: AuthMethod,
+    ) -> io::Result<Option<Self::Credentials>> {
         let user = self.get_user(conn).await?;
 
         let credentials = self.user_validator.validate_user(user).await?;

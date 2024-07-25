@@ -10,7 +10,7 @@ const PRIVATE_METHOD_UPPER: u8 = 0xFE;
 
 const NO_ACCEPTABLE_METHODS: u8 = 0xFF;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 #[repr(u8)]
 pub enum AuthMethod {
     NoAuthRequired,
@@ -32,8 +32,8 @@ impl AuthMethod {
             _ => unreachable!("u8 range handled fully"),
         }
     }
-    pub(crate) fn to_u8(&self) -> u8 {
-        match *self {
+    pub(crate) fn to_u8(self) -> u8 {
+        match self {
             AuthMethod::NoAuthRequired => NO_AUTH_REQUIRED,
             AuthMethod::Gssapi => GSSAPI,
             AuthMethod::UsernamePassword => USERNAME_PASSWORD,

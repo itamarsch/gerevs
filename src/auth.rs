@@ -15,16 +15,12 @@ where
     T: AsyncRead + AsyncWrite + Unpin + Send,
 {
     type Credentials;
-    /// Selects which method to use
+
     fn select_method(&self, methods: &[AuthMethod]) -> AuthMethod;
 
-    /// Authenticator Should:
-    /// Uses `conn` for comunication,
-    /// perform all the communication for authentication
-    /// return Some(credentials) on success
-    /// return None on auth failure
     fn authenticate(
         &mut self,
         conn: &mut T,
+        selected_method: AuthMethod,
     ) -> impl Future<Output = io::Result<Option<Self::Credentials>>> + Send;
 }

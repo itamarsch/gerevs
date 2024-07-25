@@ -63,7 +63,11 @@ where
         debug!("Selected method: {:?}", method);
         self.write_auth_method(method).await?;
 
-        let credentials = match self.authenticator.authenticate(&mut self.inner).await {
+        let credentials = match self
+            .authenticator
+            .authenticate(&mut self.inner, method)
+            .await
+        {
             Ok(Some(credentials)) => credentials,
 
             Ok(None) => {
