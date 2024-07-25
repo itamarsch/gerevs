@@ -1,7 +1,6 @@
 use std::{
     future::Future,
     io::{self, ErrorKind},
-    marker::PhantomData,
 };
 
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
@@ -25,27 +24,30 @@ enum AuthStatus {
     Failure = 0x01,
 }
 
-pub trait UserValidator<R> {
-    fn validate_user(&mut self, user: User) -> impl Future<Output = io::Result<Option<R>>> + Send;
+pub trait UserValidator {
+    type Credentials;
+    fn validate_user(
+        &mut self,
+        user: User,
+    ) -> impl Future<Output = io::Result<Option<Self::Credentials>>> + Send;
 }
 
-pub struct UserAuthenticator<R, U>
+pub struct UserAuthenticator<U>
 where
-    U: UserValidator<R>,
+    U: UserValidator,
 {
-    phantom_data_credentials: PhantomData<R>,
     user_validator: U,
 }
 
-impl<T, R, U> Authenticator<T> for UserAuthenticator<R, U>
+impl<T, U> Authenticator<T> for UserAuthenticator<U>
 where
     T: AsyncRead + AsyncWrite + Unpin + Send,
-    R: Send + Sync,
-    U: UserValidator<R> + Send + Sync,
+    U: UserValidator + Send + Sync,
+    U::Credentials: Send,
 {
-    type Credentials = R;
+    type Credentials = U::Credentials;
 
-    async fn authenticate(&mut self, conn: &mut T) -> io::Result<Option<R>> {
+    async fn authenticate(&mut self, conn: &mut T) -> io::Result<Option<Self::Credentials>> {
         let user = self.get_user(conn).await?;
 
         let credentials = self.user_validator.validate_user(user).await?;
@@ -72,15 +74,12 @@ where
     }
 }
 
-impl<R, U> UserAuthenticator<R, U>
+impl<U> UserAuthenticator<U>
 where
-    U: UserValidator<R>,
+    U: UserValidator,
 {
-    pub fn new(user_validator: U) -> UserAuthenticator<R, U> {
-        UserAuthenticator {
-            phantom_data_credentials: PhantomData,
-            user_validator,
-        }
+    pub fn new(user_validator: U) -> UserAuthenticator<U> {
+        UserAuthenticator { user_validator }
     }
     async fn get_user<T>(&self, conn: &mut T) -> io::Result<User>
     where

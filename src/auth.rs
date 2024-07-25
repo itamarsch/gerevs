@@ -4,9 +4,11 @@ use tokio::io::{AsyncRead, AsyncWrite};
 
 use crate::protocol::AuthMethod;
 
-pub mod no_auth_authenticator;
-pub mod simple_user_authenticator;
-pub mod user_authenticator;
+mod no_auth_authenticator;
+mod user_authenticator;
+
+pub use no_auth_authenticator::*;
+pub use user_authenticator::*;
 
 pub trait Authenticator<T>
 where

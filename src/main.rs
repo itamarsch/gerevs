@@ -1,5 +1,5 @@
 use gerevs::{
-    auth::simple_user_authenticator,
+    auth::NoAuthAuthenticator,
     method_handlers::{tunnel_associate::TunnelAssociate, TunnelBind, TunnelConnect},
     socks5_socket::Sock5Socket,
 };
@@ -35,7 +35,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 async fn handle_connection(client: TcpStream) -> gerevs::Result<()> {
     let mut sock5_stream = Sock5Socket::new(
         client,
-        simple_user_authenticator::simple_user_authenticator(),
+        NoAuthAuthenticator,
         TunnelConnect,
         TunnelBind,
         TunnelAssociate,
