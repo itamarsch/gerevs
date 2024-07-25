@@ -9,6 +9,9 @@ use crate::auth::Authenticator;
 use crate::method_handlers::{Associate, Bind, Connect};
 use crate::protocol::{AuthMethod, Command, Reply, SocksSocketAddr, RESERVED, VERSION};
 
+/// The `Sock5Socket` struct represents a SOCKS5 protocol handler that manages the connection
+/// between a client and a server. It handles authentication, command parsing, and the execution
+/// of the CONNECT, BIND, and UDP ASSOCIATE commands.
 pub struct Sock5Socket<T, A, Connect, Bind, Associate> {
     inner: T,
     authenticator: A,
@@ -27,6 +30,17 @@ where
     T: AsyncRead + AsyncWrite + Unpin + Send,
     Auth: Authenticator<T>,
 {
+    /// Creates a new `Sock5Socket` instance.
+    ///
+    /// - `inner`: The underlying I/O stream.
+    /// - `authenticator`: The authenticator for handling client authentication.
+    /// - `connect_handler`: The handler for the CONNECT command.
+    /// - `bind_handler`: The handler for the BIND command.
+    /// - `associate_handler`: The handler for the UDP ASSOCIATE command.
+    ///
+    /// # Returns
+    ///
+    /// A new instance of `Sock5Socket`.
     pub fn new(
         inner: T,
         authenticator: Auth,
@@ -95,6 +109,12 @@ where
     B: Bind<Auth::Credentials>,
     C: Connect<Auth::Credentials>,
 {
+    /// Runs the SOCKS5 protocol handler. It handles client requests, including CONNECT,
+    /// BIND, and UDP ASSOCIATE commands, and forwards data between the client and the server.
+    ///
+    /// # Returns
+    ///
+    /// A future that resolves to `crate::Result<()>` indicating the success or failure of the operation.
     pub async fn run(&mut self) -> crate::Result<()> {
         let (command, addr, credentials) = self.socks_request().await?;
         match command {
