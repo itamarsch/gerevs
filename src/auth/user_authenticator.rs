@@ -5,7 +5,7 @@ use std::{
 };
 
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
-use tracing::trace;
+use tracing::debug;
 
 use crate::protocol::AuthMethod;
 
@@ -120,10 +120,9 @@ where
         let password = String::from_utf8(buf)
             .map_err(|_| io::Error::new(ErrorKind::InvalidData, "Password was invalid utf8"))?;
 
-        trace!(
+        debug!(
             "Received username: {:?}, and password: {:?}",
-            username,
-            password
+            username, password
         );
         let user: User = User { username, password };
         Ok(user)

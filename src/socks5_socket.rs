@@ -2,7 +2,7 @@ use std::io::{self, ErrorKind};
 
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tracing::{info, instrument, trace};
+use tracing::{debug, info, instrument};
 
 use crate::auth::Authenticator;
 
@@ -60,10 +60,10 @@ where
     #[instrument(skip(self))]
     async fn authenticate(&mut self) -> io::Result<Auth::Credentials> {
         let methods = self.parse_methods().await?;
-        trace!("Received methods: {:?}", methods);
+        debug!("Received methods: {:?}", methods);
 
         let method = self.authenticator.select_method(&methods);
-        trace!("Selected method: {:?}", method);
+        debug!("Selected method: {:?}", method);
         self.write_auth_method(method).await?;
 
         let credentials = match self.authenticator.authenticate(&mut self.inner).await {
@@ -79,7 +79,7 @@ where
                 return Err(err);
             }
         };
-        trace!("Authentication success");
+        debug!("Authentication success");
         Ok(credentials)
     }
 }

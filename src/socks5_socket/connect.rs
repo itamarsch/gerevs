@@ -1,5 +1,5 @@
 use tokio::io::{AsyncRead, AsyncWrite};
-use tracing::{info, instrument, trace};
+use tracing::{debug, info, instrument};
 
 use crate::{
     auth::Authenticator,
@@ -29,7 +29,7 @@ where
                 .await
                 .map_err(|err| Socks5Error::Socks5Error(err.into()))?;
 
-            trace!("Connection established with: {}", addr);
+            debug!("Connection established with: {}", addr);
             self.reply(Reply::Success, addr.clone()).await?;
 
             self.connect_handler

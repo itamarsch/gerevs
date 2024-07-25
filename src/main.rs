@@ -5,7 +5,7 @@ use gerevs::{
 };
 use std::error::Error;
 use tokio::net::{TcpListener, TcpStream};
-use tracing::{error, span, trace, Instrument, Level};
+use tracing::{debug, span, warn, Instrument, Level};
 use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
@@ -17,14 +17,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let server = TcpListener::bind("0.0.0.0:8080").await?;
     loop {
         let (client, _addr) = server.accept().await?;
-        trace!("Received connection from: {:?}", _addr);
+        debug!("Received connection from: {:?}", _addr);
         let connection = span!(Level::INFO, "connection", %_addr);
 
         tokio::spawn(
             async move {
                 let result = handle_connection(client).await;
                 if let Err(err) = result {
-                    error!("Failed connection: {:?}", err);
+                    warn!("Failed connection: {:?}", err);
                 }
             }
             .instrument(connection),

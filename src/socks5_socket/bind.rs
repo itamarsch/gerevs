@@ -1,5 +1,5 @@
 use tokio::io::{AsyncRead, AsyncWrite};
-use tracing::{info, instrument, trace};
+use tracing::{debug, info, instrument};
 
 use crate::{
     auth::Authenticator,
@@ -33,7 +33,7 @@ where
             let localaddr = server
                 .local_addr()
                 .map_err(|err| crate::Socks5Error::Socks5Error(err.kind().into()))?;
-            trace!("Listening on {}", localaddr);
+            debug!("Listening on {}", localaddr);
 
             self.reply(Reply::Success, localaddr.into()).await?;
 
@@ -43,7 +43,7 @@ where
                 .await
                 .map_err(|err| crate::Socks5Error::Socks5Error(err.into()))?;
 
-            trace!("Accepted client {}, starting to listen", client_addr);
+            debug!("Accepted client {}, starting to listen", client_addr);
 
             self.reply(Reply::Success, client_addr.into()).await?;
 

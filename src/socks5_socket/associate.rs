@@ -7,7 +7,7 @@ use tokio::{
     io::{AsyncRead, AsyncReadExt, AsyncWrite},
     select,
 };
-use tracing::{error, info, instrument, trace, warn};
+use tracing::{debug, error, info, instrument, trace, warn};
 
 use crate::{
     auth::Authenticator,
@@ -66,7 +66,7 @@ where
             .await
             .map_err(|err| Socks5Error::Socks5Error(err.into()))?;
 
-        trace!("Listening on udp: {}", localaddr);
+        debug!("Listening on udp: {}", localaddr);
 
         self.reply(Reply::Success, localaddr.into()).await?;
 
@@ -113,11 +113,12 @@ where
                     };
                 }
             };
-            trace!("Received {} bytes from: {}", n, source);
+            debug!("Received {} bytes from: {}", n, source);
+            trace!("Bytes: {:?}", &buf[..n]);
 
             if verified_client_addr.is_none() && addrs_match(client_addrs, &source).await {
                 verified_client_addr = Some(source);
-                trace!("{} is the client", source);
+                debug!("{} is the client", source);
             }
 
             // No client, ignore message
@@ -155,7 +156,7 @@ where
     ) -> crate::Result<usize> {
         let udp_message = UdpMessage::parse(buf).await?;
         let dst = &*udp_message.dst.to_socket_addr().await?;
-        trace!("Sending {} bytes to: {:?}", udp_message.data.len(), dst);
+        debug!("Sending {} bytes to: {:?}", udp_message.data.len(), dst);
 
         self.associate_handler
             .send_to(conn, udp_message.data, dst, credntials)
@@ -177,7 +178,7 @@ where
         };
 
         let response = &response.as_bytes()[..];
-        trace!(
+        debug!(
             "Sending {} bytes back to client ({:?})",
             response.len(),
             client
