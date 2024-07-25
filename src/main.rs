@@ -1,5 +1,8 @@
 use gerevs::{
-    auth::NoAuthAuthenticator,
+    auth::{
+        username_password_authenticator::{UserAuthenticator, UsernamePasswordAuthenticator},
+        NoAuthAuthenticator,
+    },
     method_handlers::{TunnelAssociate, TunnelBind, TunnelConnect},
     Sock5Socket,
 };
@@ -35,10 +38,26 @@ async fn main() -> Result<(), Box<dyn Error>> {
 async fn handle_connection(client: TcpStream) -> gerevs::Result<()> {
     let mut sock5_stream = Sock5Socket::new(
         client,
-        NoAuthAuthenticator,
+        UsernamePasswordAuthenticator::new(SimpleUserAuthenticator),
         TunnelConnect,
         TunnelBind,
         TunnelAssociate,
     );
     sock5_stream.run().await
+}
+
+struct SimpleUserAuthenticator;
+impl UserAuthenticator for SimpleUserAuthenticator {
+    type Credentials = ();
+
+    async fn authenticate_user(
+        &mut self,
+        user: gerevs::auth::username_password_authenticator::User,
+    ) -> std::io::Result<Option<Self::Credentials>> {
+        if user.username == "itamar" && user.password == "password" {
+            Ok(Some(()))
+        } else {
+            Ok(None)
+        }
+    }
 }
