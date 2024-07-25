@@ -4,7 +4,7 @@ use protocol::Reply;
 
 pub mod auth;
 pub mod method_handlers;
-pub mod protocol;
+pub(crate) mod protocol;
 pub mod socks5_socket;
 use thiserror::Error;
 

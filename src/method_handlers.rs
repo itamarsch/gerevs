@@ -2,8 +2,8 @@ mod associate;
 mod bind;
 mod connect;
 
-pub use associate::associate_denier;
-pub use associate::tunnel_associate;
+pub use associate::associate_denier::AssociateDenier;
+pub use associate::tunnel_associate::TunnelAssociate;
 pub use associate::Associate;
 
 pub use bind::bind_denier::BindDenier;

@@ -3,8 +3,6 @@ mod command;
 mod methods;
 mod reply;
 
-pub use addr::Addr;
-pub use addr::AddressType;
 pub use addr::SocksSocketAddr;
 pub use command::Command;
 pub use methods::AuthMethod;
