@@ -8,9 +8,9 @@ use crate::{
     Socks5Error,
 };
 
-use super::Sock5Socket;
+use super::Socks5Socket;
 
-impl<T, Auth, C, B, A> Sock5Socket<T, Auth, C, B, A>
+impl<T, Auth, C, B, A> Socks5Socket<T, Auth, C, B, A>
 where
     Self: Unpin + Send,
     T: AsyncRead + AsyncWrite + Unpin + Send,

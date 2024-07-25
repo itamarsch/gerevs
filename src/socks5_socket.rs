@@ -9,10 +9,10 @@ use crate::auth::Authenticator;
 use crate::method_handlers::{Associate, Bind, Connect};
 use crate::protocol::{AuthMethod, Command, Reply, SocksSocketAddr, RESERVED, VERSION};
 
-/// The `Sock5Socket` struct represents a SOCKS5 protocol handler that manages the connection
+/// The `Socks5Socket` struct represents a SOCKS5 protocol handler that manages the connection
 /// between a client and a server. It handles authentication, command parsing, and the execution
 /// of the CONNECT, BIND, and UDP ASSOCIATE commands.
-pub struct Sock5Socket<T, A, Connect, Bind, Associate> {
+pub struct Socks5Socket<T, A, Connect, Bind, Associate> {
     inner: T,
     authenticator: A,
     connect_handler: Connect,
@@ -24,13 +24,13 @@ mod associate;
 mod bind;
 mod connect;
 
-impl<T, Auth, C, B, A> Sock5Socket<T, Auth, C, B, A>
+impl<T, Auth, C, B, A> Socks5Socket<T, Auth, C, B, A>
 where
     Self: Unpin + Send,
     T: AsyncRead + AsyncWrite + Unpin + Send,
     Auth: Authenticator<T>,
 {
-    /// Creates a new `Sock5Socket` instance.
+    /// Creates a new `Socks5Socket` instance.
     ///
     /// - `inner`: The underlying I/O stream.
     /// - `authenticator`: The authenticator for handling client authentication.
@@ -40,7 +40,7 @@ where
     ///
     /// # Returns
     ///
-    /// A new instance of `Sock5Socket`.
+    /// A new instance of `Socks5Socket`.
     pub fn new(
         inner: T,
         authenticator: Auth,
@@ -99,7 +99,7 @@ where
     }
 }
 
-impl<T, Auth, C, B, A> Sock5Socket<T, Auth, C, B, A>
+impl<T, Auth, C, B, A> Socks5Socket<T, Auth, C, B, A>
 where
     Self: Unpin + Send,
     T: AsyncWrite + AsyncRead + Send + Unpin,
@@ -126,7 +126,7 @@ where
     }
 }
 
-impl<T, Auth, C, B, A> Sock5Socket<T, Auth, C, B, A>
+impl<T, Auth, C, B, A> Socks5Socket<T, Auth, C, B, A>
 where
     Self: Unpin + Send,
     T: AsyncRead + AsyncWrite + Unpin + Send,

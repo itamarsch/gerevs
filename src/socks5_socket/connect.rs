@@ -8,8 +8,8 @@ use crate::{
     Socks5Error,
 };
 
-use super::Sock5Socket;
-impl<T, Auth, C, B, A> Sock5Socket<T, Auth, C, B, A>
+use super::Socks5Socket;
+impl<T, Auth, C, B, A> Socks5Socket<T, Auth, C, B, A>
 where
     Self: Unpin + Send,
     T: AsyncRead + AsyncWrite + Unpin + Send,
@@ -20,12 +20,12 @@ where
     pub(crate) async fn connect(
         &mut self,
         addr: SocksSocketAddr,
-        credntials: Auth::Credentials,
+        credentials: Auth::Credentials,
     ) -> crate::Result<()> {
         let connect_inner = || async {
             let conn = self
                 .connect_handler
-                .establish_connection(addr.clone(), credntials)
+                .establish_connection(addr.clone(), credentials)
                 .await
                 .map_err(|err| Socks5Error::Socks5Error(err.into()))?;
 

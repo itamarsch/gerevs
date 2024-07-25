@@ -1,10 +1,7 @@
 use gerevs::{
-    auth::{
-        username_password_authenticator::{UserAuthenticator, UsernamePasswordAuthenticator},
-        NoAuthAuthenticator,
-    },
+    auth::username_password_authenticator::{UserAuthenticator, UsernamePasswordAuthenticator},
     method_handlers::{TunnelAssociate, TunnelBind, TunnelConnect},
-    Sock5Socket,
+    Socks5Socket,
 };
 use std::error::Error;
 use tokio::net::{TcpListener, TcpStream};
@@ -36,14 +33,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
 }
 
 async fn handle_connection(client: TcpStream) -> gerevs::Result<()> {
-    let mut sock5_stream = Sock5Socket::new(
+    let mut socks5_stream = Socks5Socket::new(
         client,
         UsernamePasswordAuthenticator::new(SimpleUserAuthenticator),
         TunnelConnect,
         TunnelBind,
         TunnelAssociate,
     );
-    sock5_stream.run().await
+    socks5_stream.run().await
 }
 
 struct SimpleUserAuthenticator;

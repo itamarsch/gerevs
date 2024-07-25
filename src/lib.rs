@@ -46,7 +46,7 @@
 //! use gerevs::{
 //!     auth::NoAuthAuthenticator,
 //!     method_handlers::{TunnelAssociate, TunnelBind, TunnelConnect},
-//!     Sock5Socket,
+//!     Socks5Socket,
 //! };
 //! use std::error::Error;
 //! use tokio::net::{TcpListener, TcpStream};
@@ -67,14 +67,14 @@
 //! }
 //!
 //! async fn handle_connection(client: TcpStream) -> gerevs::Result<()> {
-//!     let mut sock5_stream = Sock5Socket::new(
+//!     let mut socks5_stream = Socks5Socket::new(
 //!         client,
 //!         NoAuthAuthenticator,
 //!         TunnelConnect,
 //!         TunnelBind,
 //!         TunnelAssociate,
 //!     );
-//!     sock5_stream.run().await
+//!     socks5_stream.run().await
 //! }
 //! ```
 //!
@@ -93,11 +93,11 @@
 //!     - `TunnelBind` implements the `Bind` trait, setting up a TCP listener that waits for incoming connections from a target server, and forwards any messages between the two.
 //!     - `TunnelAssociate` implements the `Associate` trait, Forwards UDP packets between the client and the target server.
 //!
-//! 3. **`Sock5Socket`**:
+//! 3. **`Socks5Socket`**:
 //!     - This is the main struct from the `gerevs` crate that represents a SOCKS5 connection.
 //!     - It takes the client TCP stream and the necessary handlers (authenticator and method handlers) to manage the SOCKS5 protocol interactions.
 //!
-//! 4. **`sock5_stream.run().await`**:
+//! 4. **`socks5_stream.run().await`**:
 //!     - This method starts the SOCKS5 protocol operations on the given connection.
 //!     - It processes the handshake, authentication (if any), and the command handling (CONNECT, BIND, or UDP ASSOCIATE) based on the client's requests.
 //!
@@ -114,7 +114,7 @@ pub mod auth;
 pub mod method_handlers;
 pub(crate) mod protocol;
 mod socks5_socket;
-pub use socks5_socket::Sock5Socket;
+pub use socks5_socket::Socks5Socket;
 use thiserror::Error;
 
 pub type Result<T> = std::result::Result<T, Socks5Error>;

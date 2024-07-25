@@ -18,7 +18,7 @@ use crate::{
 
 use self::udp_message::UdpMessage;
 
-use super::Sock5Socket;
+use super::Socks5Socket;
 
 mod udp_message;
 async fn addrs_match(client_addrs: &[SocketAddr], udp_addr: &SocketAddr) -> bool {
@@ -48,7 +48,7 @@ async fn addrs_match(client_addrs: &[SocketAddr], udp_addr: &SocketAddr) -> bool
     false
 }
 
-impl<T, Auth, C, B, A> Sock5Socket<T, Auth, C, B, A>
+impl<T, Auth, C, B, A> Socks5Socket<T, Auth, C, B, A>
 where
     Self: Unpin + Send,
     T: AsyncRead + AsyncWrite + Unpin + Send,
@@ -77,14 +77,14 @@ where
         &mut self,
         mut conn: A::Connection,
         client_addrs: &[SocketAddr],
-        credntials: &Auth::Credentials,
+        credentials: &Auth::Credentials,
     ) -> crate::Result<()> {
         let mut verified_client_addr = None;
         let mut buf = [0; 4096];
         let mut tcp_buf = [0; 1];
         loop {
             let (n, source) = select! {
-                result = self.associate_handler.recv_from(&mut conn,&mut buf, credntials) => {
+                result = self.associate_handler.recv_from(&mut conn,&mut buf, credentials) => {
                     let Ok((n, source)) = result else {
                         continue;
                     };
@@ -130,7 +130,7 @@ where
             };
 
             let res = if verified_client_addr == source {
-                self.forward_to_server(&mut conn, &buf[..n], credntials)
+                self.forward_to_server(&mut conn, &buf[..n], credentials)
                     .await
             } else {
                 self.forward_to_client(
@@ -138,7 +138,7 @@ where
                     &buf[..n],
                     source,
                     verified_client_addr,
-                    credntials,
+                    credentials,
                 )
                 .await
             };
@@ -152,14 +152,14 @@ where
         &mut self,
         conn: &mut A::Connection,
         buf: &[u8],
-        credntials: &Auth::Credentials,
+        credentials: &Auth::Credentials,
     ) -> crate::Result<usize> {
         let udp_message = UdpMessage::parse(buf).await?;
         let dst = &*udp_message.dst.to_socket_addr().await?;
         debug!("Sending {} bytes to: {:?}", udp_message.data.len(), dst);
 
         self.associate_handler
-            .send_to(conn, udp_message.data, dst, credntials)
+            .send_to(conn, udp_message.data, dst, credentials)
             .await
     }
 
