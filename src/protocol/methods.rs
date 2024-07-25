@@ -12,12 +12,24 @@ const NO_ACCEPTABLE_METHODS: u8 = 0xFF;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 #[repr(u8)]
+/// The `AuthMethod` enum represents the various authentication methods supported by the SOCKS5 protocol.
 pub enum AuthMethod {
+    /// No authentication is required. This method allows clients to connect without providing any credentials.
     NoAuthRequired,
+
+    /// GSSAPI (Generic Security Services Application Program Interface) authentication method.
     Gssapi,
+
+    /// Username and password authentication method. This method requires clients to provide a username and password.
     UsernamePassword,
+
+    /// IANA (Internet Assigned Numbers Authority) assigned authentication methods, represented by a `u8` value.
     IanaAssigned(u8),
+
+    /// Private authentication methods, represented by a `u8` value. These are methods that are not standardized and can be defined by private agreements.
     PrivateMethods(u8),
+
+    /// Indicates that no acceptable authentication methods are available. This method is used to indicate that the server does not accept any of the methods proposed by the client.
     NoAcceptableMethods,
 }
 

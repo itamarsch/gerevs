@@ -24,28 +24,37 @@ enum AuthStatus {
     Failure = 0x01,
 }
 
-pub trait UserAuthorizer {
+pub trait UserAuthenticator {
     type Credentials;
-    fn validate_user(
+
+    fn authenticate_user(
         &mut self,
         user: User,
     ) -> impl Future<Output = io::Result<Option<Self::Credentials>>> + Send;
 }
 
-pub struct UserAuthenticator<U>
+pub struct UsernamePasswordAuthenticator<U>
 where
-    U: UserAuthorizer,
+    U: UserAuthenticator,
 {
-    user_validator: U,
+    user_authenticator: U,
 }
 
-impl<T, U> Authenticator<T> for UserAuthenticator<U>
+impl<T, U> Authenticator<T> for UsernamePasswordAuthenticator<U>
 where
     T: AsyncRead + AsyncWrite + Unpin + Send,
-    U: UserAuthorizer + Send + Sync,
+    U: UserAuthenticator + Send + Sync,
     U::Credentials: Send,
 {
     type Credentials = U::Credentials;
+
+    fn select_method(&self, methods: &[AuthMethod]) -> AuthMethod {
+        if methods.contains(&AuthMethod::UsernamePassword) {
+            AuthMethod::UsernamePassword
+        } else {
+            AuthMethod::NoAcceptableMethods
+        }
+    }
 
     async fn authenticate(
         &mut self,
@@ -53,8 +62,7 @@ where
         _: AuthMethod,
     ) -> io::Result<Option<Self::Credentials>> {
         let user = self.get_user(conn).await?;
-
-        let credentials = self.user_validator.validate_user(user).await?;
+        let credentials = self.user_authenticator.authenticate_user(user).await?;
 
         self.send_authentication_result(
             conn,
@@ -68,35 +76,30 @@ where
 
         Ok(credentials)
     }
-
-    fn select_method(&self, methods: &[AuthMethod]) -> AuthMethod {
-        if methods.contains(&AuthMethod::UsernamePassword) {
-            AuthMethod::UsernamePassword
-        } else {
-            AuthMethod::NoAcceptableMethods
-        }
-    }
 }
 
-impl<U> UserAuthenticator<U>
+impl<U> UsernamePasswordAuthenticator<U>
 where
-    U: UserAuthorizer,
+    U: UserAuthenticator,
 {
-    pub fn new(user_validator: U) -> UserAuthenticator<U> {
-        UserAuthenticator { user_validator }
+    pub fn new(user_authorizer: U) -> UsernamePasswordAuthenticator<U> {
+        UsernamePasswordAuthenticator {
+            user_authenticator: user_authorizer,
+        }
     }
+
     async fn get_user<T>(&self, conn: &mut T) -> io::Result<User>
     where
         T: AsyncRead + Unpin,
     {
         let version = conn.read_u8().await?;
-
         if version != USER_PASSWORD_VERSION {
             return Err(io::Error::new(
                 ErrorKind::InvalidData,
                 "Invalid UsernamePassword version",
             ));
         }
+
         let username_len = conn.read_u8().await?;
         if username_len < 1 {
             return Err(io::Error::new(
@@ -127,7 +130,7 @@ where
             "Received username: {:?}, and password: {:?}",
             username, password
         );
-        let user: User = User { username, password };
+        let user = User { username, password };
         Ok(user)
     }
 
