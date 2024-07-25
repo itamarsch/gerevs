@@ -5,7 +5,8 @@ use protocol::Reply;
 pub mod auth;
 pub mod method_handlers;
 pub(crate) mod protocol;
-pub mod socks5_socket;
+mod socks5_socket;
+pub use socks5_socket::Sock5Socket;
 use thiserror::Error;
 
 pub type Result<T> = std::result::Result<T, Socks5Error>;

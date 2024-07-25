@@ -1,7 +1,7 @@
 use gerevs::{
     auth::NoAuthAuthenticator,
     method_handlers::{TunnelAssociate, TunnelBind, TunnelConnect},
-    socks5_socket::Sock5Socket,
+    Sock5Socket,
 };
 use std::error::Error;
 use tokio::net::{TcpListener, TcpStream};
