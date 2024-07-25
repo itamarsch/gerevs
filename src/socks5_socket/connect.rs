@@ -17,7 +17,7 @@ where
     C: Connect<Auth::Credentials>,
 {
     #[instrument(skip_all)]
-    pub async fn connect(
+    pub(crate) async fn connect(
         &mut self,
         addr: SocksSocketAddr,
         credntials: Auth::Credentials,

@@ -17,10 +17,9 @@ pub struct Sock5Socket<T, A, Connect, Bind, Associate> {
     associate_handler: Associate,
 }
 
-pub mod associate;
-pub mod bind;
-pub mod connect;
-pub mod socks5_io;
+mod associate;
+mod bind;
+mod connect;
 
 impl<T, Auth, C, B, A> Sock5Socket<T, Auth, C, B, A>
 where
@@ -45,9 +44,7 @@ where
     }
 
     #[instrument(skip(self))]
-    pub async fn socks_request(
-        &mut self,
-    ) -> io::Result<(Command, SocksSocketAddr, Auth::Credentials)> {
+    async fn socks_request(&mut self) -> io::Result<(Command, SocksSocketAddr, Auth::Credentials)> {
         let credentials = self.authenticate().await?;
 
         let command = self.parse_request().await?;
@@ -110,29 +107,33 @@ where
     Self: Unpin + Send,
     T: AsyncRead + AsyncWrite + Unpin + Send,
 {
-    pub async fn reply(&mut self, reply: Reply, bnd_address: SocksSocketAddr) -> io::Result<()> {
-        self.write_u8(VERSION).await?;
+    pub(crate) async fn reply(
+        &mut self,
+        reply: Reply,
+        bnd_address: SocksSocketAddr,
+    ) -> io::Result<()> {
+        self.inner.write_u8(VERSION).await?;
 
-        self.write_u8(reply.to_u8()).await?;
+        self.inner.write_u8(reply.to_u8()).await?;
 
-        self.write_u8(RESERVED).await?;
+        self.inner.write_u8(RESERVED).await?;
 
-        self.write_all(&bnd_address.to_bytes()).await?;
+        self.inner.write_all(&bnd_address.to_bytes()).await?;
 
-        self.flush().await?;
+        self.inner.flush().await?;
 
         Ok(())
     }
 
     async fn write_auth_method(&mut self, auth_method: AuthMethod) -> io::Result<()> {
-        self.write_u8(VERSION).await?;
-        self.write_u8(auth_method.to_u8()).await?;
-        self.flush().await?;
+        self.inner.write_u8(VERSION).await?;
+        self.inner.write_u8(auth_method.to_u8()).await?;
+        self.inner.flush().await?;
         Ok(())
     }
 
     async fn parse_methods(&mut self) -> io::Result<Vec<AuthMethod>> {
-        let version = self.read_u8().await?;
+        let version = self.inner.read_u8().await?;
         if version != VERSION {
             return Err(io::Error::new(
                 ErrorKind::InvalidData,
@@ -140,7 +141,7 @@ where
             ));
         }
 
-        let nmethods = self.read_u8().await?;
+        let nmethods = self.inner.read_u8().await?;
         if nmethods < 1 {
             return Err(io::Error::new(
                 ErrorKind::InvalidData,
@@ -150,7 +151,7 @@ where
 
         let mut methods = vec![0; nmethods as usize];
 
-        self.read_exact(&mut methods).await?;
+        self.inner.read_exact(&mut methods).await?;
         let methods = methods
             .into_iter()
             .map(AuthMethod::from_u8)
@@ -160,7 +161,7 @@ where
     }
 
     async fn parse_request(&mut self) -> io::Result<Command> {
-        let version = self.read_u8().await?;
+        let version = self.inner.read_u8().await?;
         if version != VERSION {
             return Err(io::Error::new(
                 ErrorKind::InvalidData,
@@ -168,7 +169,7 @@ where
             ));
         }
 
-        let command = self.read_u8().await?;
+        let command = self.inner.read_u8().await?;
         let Some(command) = Command::from_u8(command) else {
             return Err(io::Error::new(
                 ErrorKind::InvalidData,
@@ -176,7 +177,7 @@ where
             ));
         };
 
-        let reserved = self.read_u8().await?;
+        let reserved = self.inner.read_u8().await?;
         if reserved != RESERVED {
             return Err(io::Error::new(
                 ErrorKind::InvalidData,
@@ -188,6 +189,6 @@ where
     }
 
     async fn parse_addr(&mut self) -> io::Result<SocksSocketAddr> {
-        SocksSocketAddr::read(self).await
+        SocksSocketAddr::read(&mut self.inner).await
     }
 }

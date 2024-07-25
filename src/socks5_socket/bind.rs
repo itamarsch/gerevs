@@ -18,7 +18,7 @@ where
     B: Bind<Auth::Credentials>,
 {
     #[instrument(skip_all)]
-    pub async fn bind(
+    pub(crate) async fn bind(
         &mut self,
         addr: SocksSocketAddr,
         credentials: Auth::Credentials,

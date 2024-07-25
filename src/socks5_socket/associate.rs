@@ -189,7 +189,7 @@ where
     }
 
     #[instrument(skip_all)]
-    pub async fn associate(
+    pub(crate) async fn associate(
         &mut self,
         addr: SocksSocketAddr,
         credentials: Auth::Credentials,
