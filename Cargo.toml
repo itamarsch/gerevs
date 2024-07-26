@@ -8,14 +8,7 @@ name = "gerevs"
 version = "0.1.0"
 edition = "2021"
 categories = ["network-programming", "asynchronous"]
-keywords = [
-  "SOCKS5",
-  "proxy",
-  "asynchronous",
-  "tokio",
-  "authentication",
-  "network",
-]
+keywords = ["SOCKS5", "proxy", "asynchronous", "authentication", "network"]
 
 [dependencies]
 thiserror = "1.0.61"
