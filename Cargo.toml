@@ -1,7 +1,21 @@
 [package]
+authors = ["itamarsch"]
+license = "MIT"
+repository = "https://github.com/itamarsch/gerevs"
+description = "Gerevs is a Rust crate for implementing general-purpose SOCKS5 proxy servers with asynchronous execution and flexible authentication methods."
+readme = "README.md"
 name = "gerevs"
 version = "0.1.0"
 edition = "2021"
+categories = ["network-programming", "asynchronous"]
+keywords = [
+  "SOCKS5",
+  "proxy",
+  "asynchronous",
+  "tokio",
+  "authentication",
+  "network",
+]
 
 [dependencies]
 thiserror = "1.0.61"
