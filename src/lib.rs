@@ -1,4 +1,4 @@
-//! # Gerves
+//! # Gerevs
 //!
 //! This crate provides utilities for creating SOCKS5 proxy servers.
 //! It includes features like easy integration, asynchronous support,
