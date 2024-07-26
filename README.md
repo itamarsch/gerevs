@@ -29,7 +29,14 @@ The name **Gerevs** is derived from the Hebrew word "גרב" (gerev), which mean
 
 ## Getting Started
 
-Gerevs is still under active development and not yet available on crates.io. Stay tuned for updates!
+To get started with Gerevs, add it to your `Cargo.toml`:
+
+```toml
+[dependencies]
+gerevs = "0.1.1"
+```
+
+Check out the [Gerevs documentation](https://docs.rs/gerevs) for detailed usage instructions and examples.
 
 ## Contributions
 
