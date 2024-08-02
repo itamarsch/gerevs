@@ -20,7 +20,7 @@ where
         Err(Socks5Error::Socks5Error(Reply::CommandNotSupported))
     }
 
-    async fn start_listening<T>(&mut self, _: T, _: Self::ServerConnection) -> crate::Result<()>
+    async fn start_listening<T>(self, _: T, _: Self::ServerConnection) -> crate::Result<()>
     where
         T: tokio::io::AsyncWrite + tokio::io::AsyncRead + Send + Unpin,
     {

@@ -34,7 +34,7 @@ pub trait Connect<C> {
     /// - `connection`: The established server connection.
     /// - Returns: A future that resolves to `crate::Result<()>`.
     fn start_listening<T>(
-        &mut self,
+        self,
         client: T,
         connection: Self::ServerConnection,
     ) -> impl std::future::Future<Output = crate::Result<()>> + Send

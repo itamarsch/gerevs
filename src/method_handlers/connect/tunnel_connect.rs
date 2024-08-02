@@ -29,11 +29,7 @@ impl Connect<()> for TunnelConnect {
         Ok(res)
     }
 
-    async fn start_listening<T>(
-        &mut self,
-        mut client: T,
-        mut server: TcpStream,
-    ) -> crate::Result<()>
+    async fn start_listening<T>(self, mut client: T, mut server: TcpStream) -> crate::Result<()>
     where
         T: tokio::io::AsyncWrite + tokio::io::AsyncRead + Send + Unpin,
     {
