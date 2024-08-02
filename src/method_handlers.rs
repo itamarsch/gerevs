@@ -2,6 +2,7 @@ mod associate;
 mod bind;
 mod connect;
 
+pub use crate::protocol::SocksSocketAddr;
 pub use associate::associate_denier::AssociateDenier;
 pub use associate::tunnel_associate::TunnelAssociate;
 pub use associate::Associate;
