@@ -12,7 +12,7 @@ use super::Socks5Socket;
 impl<T, Auth, C, B, A> Socks5Socket<T, Auth, C, B, A>
 where
     Self: Unpin + Send,
-    T: AsyncRead + AsyncWrite + Unpin + Send,
+    T: AsyncRead + AsyncWrite + Unpin + Send + 'static,
     Auth: Authenticator<T>,
     C: Connect<Auth::Credentials>,
 {

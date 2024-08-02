@@ -33,12 +33,11 @@ pub trait Connect<C> {
     /// - `client`: A mutable reference to the client connection.
     /// - `connection`: The established server connection.
     /// - Returns: A future that resolves to `crate::Result<()>`.
-    fn start_listening<'a, T>(
+    fn start_listening<T>(
         self,
         client: T,
         connection: Self::ServerConnection,
     ) -> impl std::future::Future<Output = crate::Result<()>> + Send
     where
-        Self: 'a,
-        T: AsyncWrite + AsyncRead + Send + Unpin + 'a;
+        T: AsyncWrite + AsyncRead + Send + Unpin + 'static;
 }

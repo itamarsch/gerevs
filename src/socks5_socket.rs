@@ -102,7 +102,7 @@ where
 impl<T, Auth, C, B, A> Socks5Socket<T, Auth, C, B, A>
 where
     Self: Unpin + Send,
-    T: AsyncWrite + AsyncRead + Send + Unpin,
+    T: AsyncWrite + AsyncRead + Send + Unpin + 'static,
     Auth: Authenticator<T>,
     Auth::Credentials: Sync + Send,
     A: Associate<Auth::Credentials>,

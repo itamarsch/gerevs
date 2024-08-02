@@ -53,13 +53,12 @@ pub trait Bind<C> {
     /// - `client`: The established client connection.
     /// - `credentials`: The credentials required for the operation.
     /// - Returns: A future that resolves to `crate::Result<()>`.
-    fn start_listening<'a, T>(
+    fn start_listening<T>(
         self,
         server: T,
         client: Self::Stream,
         credentials: C,
     ) -> impl std::future::Future<Output = crate::Result<()>> + Send
     where
-        Self: 'a,
-        T: AsyncWrite + AsyncRead + Send + Unpin + 'a;
+        T: AsyncWrite + AsyncRead + Send + Unpin + 'static;
 }
