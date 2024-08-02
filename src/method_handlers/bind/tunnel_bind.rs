@@ -18,7 +18,7 @@ impl Bind<()> for TunnelBind {
 
     type Stream = TcpStream;
 
-    async fn start_listening<T>(
+    async fn start_listening<'a, T>(
         self,
         mut server: T,
         mut client: tokio::net::TcpStream,
