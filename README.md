@@ -33,7 +33,7 @@ To get started with Gerevs, add it to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-gerevs = "0.1.4"
+gerevs = "0.1.5"
 ```
 
 Check out the [Gerevs documentation](https://docs.rs/gerevs) for detailed usage instructions and examples.
