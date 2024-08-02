@@ -31,13 +31,13 @@ impl Connect<()> for TunnelConnect {
 
     async fn start_listening<T>(
         &mut self,
-        client: &mut T,
+        mut client: T,
         mut server: TcpStream,
     ) -> crate::Result<()>
     where
         T: tokio::io::AsyncWrite + tokio::io::AsyncRead + Send + Unpin,
     {
-        let res = tokio::io::copy_bidirectional(client, &mut server)
+        let res = tokio::io::copy_bidirectional(&mut client, &mut server)
             .await
             .map(|_| ());
         if let Err(err) = &res {
