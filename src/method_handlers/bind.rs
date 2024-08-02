@@ -54,8 +54,8 @@ pub trait Bind<C> {
     /// - `credentials`: The credentials required for the operation.
     /// - Returns: A future that resolves to `crate::Result<()>`.
     fn start_listening<T>(
-        &mut self,
-        server: &mut T,
+        self,
+        server: T,
         client: Self::Stream,
         credentials: C,
     ) -> impl std::future::Future<Output = crate::Result<()>> + Send

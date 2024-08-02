@@ -30,7 +30,7 @@ where
         unreachable!()
     }
 
-    async fn start_listening<T>(&mut self, _: &mut T, _: Self::Stream, _: C) -> crate::Result<()>
+    async fn start_listening<T>(self, _: T, _: Self::Stream, _: C) -> crate::Result<()>
     where
         T: tokio::io::AsyncWrite + tokio::io::AsyncRead + Send + Unpin,
     {

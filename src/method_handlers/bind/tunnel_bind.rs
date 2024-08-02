@@ -19,15 +19,15 @@ impl Bind<()> for TunnelBind {
     type Stream = TcpStream;
 
     async fn start_listening<T>(
-        &mut self,
-        server: &mut T,
+        self,
+        mut server: T,
         mut client: tokio::net::TcpStream,
         _: (),
     ) -> crate::Result<()>
     where
         T: tokio::io::AsyncWrite + tokio::io::AsyncRead + Send + Unpin,
     {
-        let res = tokio::io::copy_bidirectional(server, &mut client)
+        let res = tokio::io::copy_bidirectional(&mut server, &mut client)
             .await
             .map(|_| ());
 

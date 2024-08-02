@@ -115,7 +115,7 @@ where
     /// # Returns
     ///
     /// A future that resolves to `crate::Result<()>` indicating the success or failure of the operation.
-    pub async fn run(&mut self) -> crate::Result<()> {
+    pub async fn run(mut self) -> crate::Result<()> {
         let (command, addr, credentials) = self.socks_request().await?;
         match command {
             Command::Connect => self.connect(addr, credentials).await?,

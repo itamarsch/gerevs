@@ -18,7 +18,7 @@ where
 {
     #[instrument(skip_all)]
     pub(crate) async fn connect(
-        &mut self,
+        mut self,
         addr: SocksSocketAddr,
         credentials: Auth::Credentials,
     ) -> crate::Result<()> {
@@ -32,19 +32,26 @@ where
             debug!("Connection established with: {}", addr);
             self.reply(Reply::Success, addr.clone()).await?;
 
-            self.connect_handler
-                .start_listening(&mut self.inner, conn)
-                .await?;
-
             info!("Connection with {} closed succefully", addr);
 
-            Ok(())
+            Ok(conn)
         };
 
         let res: crate::Result<_> = connect_inner().await;
-        if let Err(Socks5Error::Socks5Error(err)) = &res {
-            self.reply(*err, Default::default()).await?;
-        }
-        res
+        let conn = match res {
+            Err(Socks5Error::Socks5Error(err)) => {
+                self.reply(err, Default::default()).await?;
+                return Err(Socks5Error::Socks5Error(err));
+            }
+            Err(err) => {
+                return Err(err);
+            }
+            Ok(conn) => conn,
+        };
+
+        self.connect_handler
+            .start_listening(self.inner, conn)
+            .await?;
+        Ok(())
     }
 }
